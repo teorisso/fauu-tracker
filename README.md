@@ -1,2 +1,1 @@
-# fauu-tracker
-## Descripción del proyecto Aplicación web para que estudiantes de Arquitectura de la UNNE (Plan 2018) hagan seguimiento de su progreso académico. Cada estudiante tiene su cuenta, su progreso se guarda en la nube y puede acceder desde cualquier dispositivo.
+Aplicación web para que estudiantes de Arquitectura de la UNNE (Plan 2018) hagan seguimiento de su progreso académico. Cada estudiante tiene su cuenta, su progreso se guarda en la nube y puede acceder desde cualquier dispositivo.
