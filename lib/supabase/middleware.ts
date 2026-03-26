@@ -49,6 +49,9 @@ export async function updateSession(request: NextRequest) {
 
   // Si el usuario ya está logueado y entra a la landing, mandarlo al dashboard
   if (user && pathname === '/') {
+    // #region agent log
+    fetch('http://127.0.0.1:7697/ingest/e080e4ee-63b6-4399-b44a-e2083cc27737',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'260da6'},body:JSON.stringify({sessionId:'260da6',location:'lib/supabase/middleware.ts:51',message:'redirect_authenticated_root_to_materias',data:{pathname},hypothesisId:'H1-H3',timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     const url = request.nextUrl.clone()
     url.pathname = '/materias'
     return NextResponse.redirect(url)
