@@ -72,15 +72,14 @@ export function DashboardClient({
         : acc
     }, 0)
     const { promedio } = calcularPromedio(estados)
-    const riesgo = MATERIAS.filter((m) => {
+    const riesgoMaterias = MATERIAS.filter((m) => {
       const e = estados[m.id]
-      return (
-        e &&
-        (e.estado === 'regular_vigente' || e.estado === 'regular_vencida') &&
-        e.vencimiento_regularidad &&
-        getVencimientoInfo(e.vencimiento_regularidad).dias < 90
-      )
-    }).length
+      if (!e || !e.vencimiento_regularidad) return false
+      if (e.estado !== 'regular_vigente') return false
+      const { dias } = getVencimientoInfo(e.vencimiento_regularidad)
+      return dias >= 0 && dias < 90
+    })
+    const riesgo = riesgoMaterias.length
     return { aprobadas, total, pct, horas, promedio, riesgo }
   }, [estados])
 

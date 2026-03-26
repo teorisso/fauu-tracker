@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { MateriaEstado } from '@/lib/types'
-import { CalendarioMesas, type MesaAnotadaInfo } from '@/components/calendario/CalendarioMesas'
-import { CountdownBanner } from '@/components/CountdownBanner'
+import type { MesaAnotadaInfo } from '@/components/calendario/CalendarioMesas'
+import { CalendarioPageClient } from '@/components/calendario/CalendarioPageClient'
 
 export default async function CalendarioPage() {
   const supabase = createClient()
@@ -51,46 +51,10 @@ export default async function CalendarioPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl p-4 md:p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Calendario de Mesas 2026</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Mesas de examen de Arquitectura Plan 2018 — FAU UNNE.
-          Marcá en qué turnos te vas a inscribir.
-        </p>
-      </div>
-
-      <CountdownBanner />
-
-      <div className="mt-4">
-      <CalendarioMesas
-        userId={user.id}
-        estados={estados}
-        mesasAnotadasInit={mesasAnotadas}
-      />
-      </div>
-
-      <div className="mt-8 rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
-        <p className="font-medium">Leyenda</p>
-        <ul className="mt-2 space-y-1">
-          <li className="flex items-center gap-2">
-            <span className="h-3 w-3 rounded-full bg-emerald-500" />
-            Regular: tenés regularidad vigente y correlatividades completas
-          </li>
-          <li className="flex items-center gap-2">
-            <span className="h-3 w-3 rounded-full bg-amber-500" />
-            Libre: podés rendir aunque no tengas regularidad vigente
-          </li>
-          <li className="flex items-center gap-2">
-            <span className="h-3 w-3 rounded-full bg-muted-foreground/40" />
-            No podés rendir: correlatividades incompletas o materia ya aprobada
-          </li>
-        </ul>
-        <p className="mt-3 text-xs">
-          Las fechas son según el Calendario Académico 2026 (RES-2025-542-CD-ARQ#UNNE).
-          Para años futuros, las mesas se actualizarán cuando se publique el calendario oficial.
-        </p>
-      </div>
-    </div>
+    <CalendarioPageClient
+      userId={user.id}
+      estados={estados}
+      mesasAnotadasInit={mesasAnotadas}
+    />
   )
 }

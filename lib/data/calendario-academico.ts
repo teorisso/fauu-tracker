@@ -2,8 +2,8 @@
  * Calendario Academico 2026 - FAU UNNE
  * Basado en RES - 2025 - 542 - CD-ARQ # UNNE
  *
- * Contiene los 7 turnos de examenes y las mesas por materia
- * segun el Anexo III del calendario oficial.
+ * Contiene los 7 turnos de examenes, las mesas por materia (Anexo III),
+ * feriados (Anexo V), cuatrimestres y fechas academicas clave.
  */
 
 export interface TurnoExamen {
@@ -152,6 +152,91 @@ export function calcularFechaMesa(turno: TurnoExamen, diaSemana: string): string
   }
   return null
 }
+
+// ─── Datos adicionales 2026 (extraídos del calendario oficial de la FAU) ────
+
+export interface Feriado {
+  fecha: string   // YYYY-MM-DD
+  nombre: string
+  tipo: 'feriado' | 'asueto' | 'no_laborable'
+}
+
+export interface Cuatrimestre {
+  nombre: string
+  inicio: string  // YYYY-MM-DD
+  fin: string     // YYYY-MM-DD
+}
+
+export interface PeriodoAcademico {
+  nombre: string
+  inicio: string
+  fin?: string
+}
+
+/** Feriados, asuetos y días no laborables 2026 (Anexo V + datos scrapeados) */
+export const FERIADOS_2026: Feriado[] = [
+  { fecha: '2026-01-01', nombre: 'Año Nuevo', tipo: 'feriado' },
+  { fecha: '2026-02-02', nombre: 'Fundación de Resistencia', tipo: 'feriado' },
+  { fecha: '2026-02-16', nombre: 'Carnaval', tipo: 'feriado' },
+  { fecha: '2026-02-17', nombre: 'Carnaval', tipo: 'feriado' },
+  { fecha: '2026-03-23', nombre: 'Día no laborable con fines turísticos', tipo: 'no_laborable' },
+  { fecha: '2026-03-24', nombre: 'Día de la Memoria por la Verdad y la Justicia', tipo: 'feriado' },
+  { fecha: '2026-04-02', nombre: 'Veteranos y Caídos en Malvinas / Jueves Santo', tipo: 'feriado' },
+  { fecha: '2026-04-03', nombre: 'Viernes Santo', tipo: 'feriado' },
+  { fecha: '2026-05-01', nombre: 'Día del Trabajador', tipo: 'feriado' },
+  { fecha: '2026-05-25', nombre: 'Revolución de Mayo', tipo: 'feriado' },
+  { fecha: '2026-06-15', nombre: 'Gral. Martín M. de Güemes (trasladable)', tipo: 'feriado' },
+  { fecha: '2026-06-20', nombre: 'Gral. Manuel Belgrano', tipo: 'feriado' },
+  { fecha: '2026-07-09', nombre: 'Día de la Independencia', tipo: 'feriado' },
+  { fecha: '2026-08-17', nombre: 'Gral. José de San Martín (trasladable)', tipo: 'feriado' },
+  { fecha: '2026-08-27', nombre: 'San Fernando Rey', tipo: 'asueto' },
+  { fecha: '2026-09-17', nombre: 'Día del Docente Universitario', tipo: 'no_laborable' },
+  { fecha: '2026-09-21', nombre: 'Día del Estudiante', tipo: 'asueto' },
+  { fecha: '2026-10-12', nombre: 'Día de Respeto a la Diversidad Cultural (trasladable)', tipo: 'feriado' },
+  { fecha: '2026-11-23', nombre: 'Día de la Soberanía Nacional (20/11 trasladado)', tipo: 'feriado' },
+  { fecha: '2026-11-26', nombre: 'Día del No Docente Universitario', tipo: 'asueto' },
+  { fecha: '2026-12-08', nombre: 'Inmaculada Concepción', tipo: 'feriado' },
+  { fecha: '2026-12-13', nombre: 'Día Provincial de la Memoria (Chaco)', tipo: 'feriado' },
+  { fecha: '2026-12-14', nombre: 'Aniversario creación UNNE', tipo: 'asueto' },
+  { fecha: '2026-12-25', nombre: 'Navidad', tipo: 'feriado' },
+]
+
+/** Cuatrimestres y receso invernal 2026 */
+export const CUATRIMESTRES_2026: Cuatrimestre[] = [
+  {
+    nombre: '1° Cuatrimestre',
+    inicio: '2026-03-16',
+    fin: '2026-07-04',
+  },
+  {
+    nombre: 'Receso Invernal',
+    inicio: '2026-07-20',
+    fin: '2026-07-31',
+  },
+  {
+    nombre: '2° Cuatrimestre',
+    inicio: '2026-08-18',
+    fin: '2026-11-28',
+  },
+]
+
+/** Fechas académicas clave 2026 (inicio de clases, actas, egresados, etc.) */
+export const FECHAS_ACADEMICAS_2026: PeriodoAcademico[] = [
+  { nombre: 'Inicio dictado asignaturas 1er cuatrimestre', inicio: '2026-03-16' },
+  { nombre: 'Recuperatorios finales', inicio: '2026-02-18', fin: '2026-02-27' },
+  { nombre: 'Presentación de Unidades Pedagógicas', inicio: '2026-03-04', fin: '2026-03-06' },
+  { nombre: 'Acto Académico de Egresados (junio)', inicio: '2026-06-26' },
+  { nombre: 'Fin dictado asignaturas 1er cuatrimestre', inicio: '2026-07-04' },
+  { nombre: 'Inicio dictado asignaturas 2do cuatrimestre', inicio: '2026-08-18' },
+  { nombre: 'Acto Académico de Egresados (noviembre)', inicio: '2026-11-27' },
+  { nombre: 'Fin dictado asignaturas cuatrimestrales 2do cuatrimestre', inicio: '2026-11-28' },
+  { nombre: 'Fin dictado asignaturas de Taller', inicio: '2026-12-04' },
+]
+
+/** Períodos de recuperatorios finales 2026 */
+export const RECUPERATORIOS_2026 = [
+  { inicio: '2026-02-18', fin: '2026-02-27', nombre: 'Recuperatorios finales' },
+]
 
 /**
  * Devuelve todas las fechas de mesas para una materia dada en todos los turnos.
