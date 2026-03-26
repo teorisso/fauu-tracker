@@ -30,17 +30,27 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const pathname = request.nextUrl.pathname
-  const isAuthRoute = pathname === '/login' || pathname.startsWith('/callback')
+  const isPublicRoute =
+    pathname === '/' ||
+    pathname === '/login' ||
+    pathname.startsWith('/callback')
 
-  if (!user && !isAuthRoute) {
+  if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  if (user && isAuthRoute) {
+  if (user && (pathname === '/login' || pathname.startsWith('/callback'))) {
     const url = request.nextUrl.clone()
-    url.pathname = '/'
+    url.pathname = '/materias'
+    return NextResponse.redirect(url)
+  }
+
+  // Si el usuario ya está logueado y entra a la landing, mandarlo al dashboard
+  if (user && pathname === '/') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/materias'
     return NextResponse.redirect(url)
   }
 

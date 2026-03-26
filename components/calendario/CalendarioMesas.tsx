@@ -11,7 +11,8 @@ import {
 import { validarCorrelatividades } from '@/lib/logic/correlatividades'
 import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle2, Clock, AlertTriangle, Calendar } from 'lucide-react'
+import { CheckCircle2, Clock, AlertTriangle, Calendar, ExternalLink, Download } from 'lucide-react'
+import { buildGCalUrl, downloadICS, generateICS } from '@/lib/utils/ics-generator'
 
 interface MesaConFecha {
   materiaId: string
@@ -214,33 +215,82 @@ export function CalendarioMesas({ userId, estados, mesasAnotadasInit }: Calendar
             )}
           </div>
           {puede && (
-            <button
-              onClick={() => toggleAnotado(mesa.materiaId, mesa.fecha, turno.numero, condicion!)}
-              className={`shrink-0 rounded-md border px-2 py-1 text-xs transition-colors ${
-                anotado
-                  ? condicion === 'libre'
-                    ? 'border-amber-500 bg-amber-500 text-white'
-                    : 'border-emerald-500 bg-emerald-500 text-white'
-                  : condicion === 'libre'
-                    ? 'border-border hover:border-amber-400 hover:text-amber-600'
-                    : 'border-border hover:border-emerald-400 hover:text-emerald-600'
-              }`}
-            >
-              {anotado ? (
-                <span className="flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3" /> Anotado
-                </span>
-              ) : (
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  {condicion === 'libre' ? 'Anotar (libre)' : 'Anotar'}
-                </span>
-              )}
-            </button>
+            <div className="flex shrink-0 flex-col gap-1">
+              <button
+                onClick={() => toggleAnotado(mesa.materiaId, mesa.fecha, turno.numero, condicion!)}
+                className={`rounded-md border px-2 py-1 text-xs transition-colors ${
+                  anotado
+                    ? condicion === 'libre'
+                      ? 'border-amber-500 bg-amber-500 text-white'
+                      : 'border-emerald-500 bg-emerald-500 text-white'
+                    : condicion === 'libre'
+                      ? 'border-border hover:border-amber-400 hover:text-amber-600'
+                      : 'border-border hover:border-emerald-400 hover:text-emerald-600'
+                }`}
+              >
+                {anotado ? (
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" /> Anotado
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {condicion === 'libre' ? 'Anotar (libre)' : 'Anotar'}
+                  </span>
+                )}
+              </button>
+              <a
+                href={buildGCalUrl({
+                  title: `Examen: ${materia?.nombre ?? mesa.nombreOficial}`,
+                  date: mesa.fecha,
+                  startTime: (() => {
+                    const m = mesa.hora.match(/(\d{2})[.:](\d{2})/)
+                    return m ? `${m[1]}:${m[2]}` : undefined
+                  })(),
+                  description: `${turno.nombre} · ${condicion === 'libre' ? 'Como libre' : 'Regular'}`,
+                  location: mesa.aula ?? 'FAU-UNNE',
+                })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:border-primary/50 hover:text-primary transition-colors"
+                title="Agregar a Google Calendar"
+              >
+                <ExternalLink className="h-3 w-3" /> GCal
+              </a>
+            </div>
           )}
         </div>
       </div>
     )
+  }
+
+  function exportarTurnoICS() {
+    const anotadasEnTurno = [...mesasRegular, ...mesasLibre].filter(({ mesa }) => {
+      const key = `${mesa.materiaId}-${mesa.fecha}`
+      return mesasAnotadas[key]?.anotado
+    })
+
+    if (anotadasEnTurno.length === 0) {
+      alert('No tenés mesas anotadas en este turno para exportar.')
+      return
+    }
+
+    const events = anotadasEnTurno.map(({ mesa, resultado }) => {
+      const materia = MATERIAS.find((m) => m.id === mesa.materiaId)
+      const horaMatch = mesa.hora.match(/(\d{2})[.:](\d{2})/)
+      const startTime = horaMatch ? `${horaMatch[1]}:${horaMatch[2]}` : undefined
+      return {
+        uid: `${mesa.materiaId}-${mesa.fecha}-${turno.numero}`,
+        title: `Examen: ${materia?.nombre ?? mesa.nombreOficial}`,
+        date: mesa.fecha,
+        startTime,
+        description: `${turno.nombre} · ${resultado.condicion === 'libre' ? 'Como libre' : 'Regular'}${mesa.aula ? ` · Aula: ${mesa.aula}` : ''}`,
+        location: mesa.aula ?? 'FAU-UNNE',
+      }
+    })
+
+    const ics = generateICS(events, `Mesas ${turno.nombre} FAU-UNNE`)
+    downloadICS(ics, `mesas-${turno.numero}er-turno-2026`)
   }
 
   return (
@@ -280,7 +330,7 @@ export function CalendarioMesas({ userId, estados, mesasAnotadasInit }: Calendar
               {formatFechaCorta(turno.inscripcionHasta)}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
             {turno.suspensionClases && (
               <Badge variant="outline" className="text-xs">
                 <Clock className="mr-1 h-3 w-3" />
@@ -297,6 +347,13 @@ export function CalendarioMesas({ userId, estados, mesasAnotadasInit }: Calendar
                 {mesasLibre.length} como libre
               </Badge>
             )}
+            <button
+              onClick={() => exportarTurnoICS()}
+              title="Exportar mesas anotadas como .ics"
+              className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:border-primary/50 hover:text-primary transition-colors"
+            >
+              <Download className="h-3 w-3" /> .ics
+            </button>
           </div>
         </div>
       </div>

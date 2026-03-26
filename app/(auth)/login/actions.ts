@@ -45,5 +45,5 @@ export async function signInWithMagicLink(email: string) {
 export async function signOut() {
   const supabase = createClient()
   await supabase.auth.signOut()
-  redirect('/login')
+  redirect('/')
 }

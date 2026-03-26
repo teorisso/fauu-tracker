@@ -4,7 +4,7 @@ import { type EmailOtpType } from '@supabase/supabase-js'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
-  const next = searchParams.get('next') ?? '/'
+  const next = searchParams.get('next') ?? '/materias'
 
   // Supabase sends error params directly when the link is invalid/expired
   const errorParam = searchParams.get('error_description')
