@@ -8,15 +8,9 @@ import {
   CUATRIMESTRES_2026,
   RECUPERATORIOS_2026,
 } from '@/lib/data/calendario-academico'
-import { Badge } from '@/components/ui/badge'
-
 const MONTH_NAMES_SHORT = [
   'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
   'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
-]
-const MONTH_NAMES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ]
 
 const TURNO_COLORS = [
@@ -79,7 +73,6 @@ export function CalendarTimeline() {
   // Month column guides
   const monthGuides = useMemo(() => {
     return Array.from({ length: 12 }, (_, i) => {
-      const d = new Date(year, i, 1)
       const doy = dayOfYear(`${year}-${String(i + 1).padStart(2, '0')}-01`)
       return {
         label: MONTH_NAMES_SHORT[i],
