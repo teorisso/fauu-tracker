@@ -66,7 +66,7 @@ function buildDayIndex(): Map<string, DayEvent[]> {
   // Cuatrimestres
   for (const c of CUATRIMESTRES_2026) {
     if (c.nombre === 'Receso Invernal') {
-      let d = new Date(c.inicio + 'T12:00:00')
+      const d = new Date(c.inicio + 'T12:00:00')
       const fin = new Date(c.fin + 'T12:00:00')
       while (d <= fin) {
         addEvent(d.toISOString().slice(0, 10), {
@@ -92,7 +92,7 @@ function buildDayIndex(): Map<string, DayEvent[]> {
 
   // Recuperatorios
   for (const r of RECUPERATORIOS_2026) {
-    let d = new Date(r.inicio + 'T12:00:00')
+    const d = new Date(r.inicio + 'T12:00:00')
     const fin = new Date(r.fin + 'T12:00:00')
     while (d <= fin) {
       addEvent(d.toISOString().slice(0, 10), {
@@ -106,7 +106,7 @@ function buildDayIndex(): Map<string, DayEvent[]> {
 
   // Turnos (períodos completos)
   for (const t of TURNOS_2026) {
-    let d = new Date(t.fechaInicio + 'T12:00:00')
+    const d = new Date(t.fechaInicio + 'T12:00:00')
     const fin = new Date(t.fechaFin + 'T12:00:00')
     while (d <= fin) {
       addEvent(d.toISOString().slice(0, 10), {
