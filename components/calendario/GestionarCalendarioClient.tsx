@@ -14,8 +14,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { ExternalLink, RefreshCw, Plus, Trash2, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { ExternalLink, RefreshCw, Plus, Trash2, Loader2, AlertTriangle, CheckCircle2, Download } from 'lucide-react'
 import type { CalendarioFAUData } from '@/app/api/calendario-fau/[year]/route'
+import type { MesasFAUData } from '@/app/api/mesas-fau/route'
 
 interface MesaCustomRow {
   id: string
@@ -53,6 +54,12 @@ export function GestionarCalendarioClient({
   const [scraperData, setScraperData] = useState<CalendarioFAUData | null>(null)
   const [scraperError, setScraperError] = useState<string | null>(null)
 
+  // Mesas FAU sync state
+  const [mesasSyncStatus, setMesasSyncStatus] = useState<'idle' | 'loading' | 'preview' | 'importing' | 'ok' | 'error'>('idle')
+  const [mesasSyncData, setMesasSyncData] = useState<MesasFAUData | null>(null)
+  const [mesasSyncError, setMesasSyncError] = useState<string | null>(null)
+  const [mesasSyncCount, setMesasSyncCount] = useState(0)
+
   // Form state
   const [formOpen, setFormOpen] = useState(false)
   const [formLoading, setFormLoading] = useState(false)
@@ -67,6 +74,80 @@ export function GestionarCalendarioClient({
   })
 
   const mesasDelAno = mesasCustom.filter((m) => m.anio === selectedYear)
+
+  async function obtenerMesasFAU() {
+    setMesasSyncStatus('loading')
+    setMesasSyncError(null)
+    setMesasSyncData(null)
+    try {
+      const res = await fetch('/api/mesas-fau')
+      const json = await res.json()
+      if (!res.ok) {
+        setMesasSyncError(json.error ?? 'Error al obtener mesas de la FAU')
+        setMesasSyncStatus('error')
+      } else {
+        setMesasSyncData(json as MesasFAUData)
+        setMesasSyncStatus('preview')
+      }
+    } catch {
+      setMesasSyncError('No se pudo conectar. Verificá tu conexión a internet.')
+      setMesasSyncStatus('error')
+    }
+  }
+
+  async function importarMesasFAU() {
+    if (!mesasSyncData || mesasSyncData.anio !== selectedYear || selectedYear < 2027) return
+
+    setMesasSyncStatus('importing')
+    const supabase = createClient()
+
+    const rows: object[] = []
+    for (const mesa of mesasSyncData.mesas) {
+      if (!mesa.materiaId) continue
+      const materia = MATERIAS.find((m) => m.id === mesa.materiaId)
+      for (const turno of mesasSyncData.turnos) {
+        rows.push({
+          user_id: userId,
+          anio: mesasSyncData.anio,
+          materia_id: mesa.materiaId,
+          nombre_oficial: materia?.nombre ?? mesa.nombreOficial,
+          dia_semana: mesa.diaSemana,
+          hora: mesa.hora,
+          aula: mesa.aula ?? null,
+          turno_numero: turno.numero,
+          fecha_inicio: turno.fechaInicio,
+          fecha_fin: turno.fechaFin,
+        })
+      }
+    }
+
+    const { error } = await supabase
+      .from('mesas_custom')
+      .upsert(rows, { onConflict: 'user_id,anio,materia_id,turno_numero' })
+
+    if (error) {
+      setMesasSyncError(`Error al importar: ${error.message}`)
+      setMesasSyncStatus('error')
+      return
+    }
+
+    // Refresh local list
+    const { data: fresh } = await supabase
+      .from('mesas_custom')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('anio', selectedYear)
+
+    if (fresh) {
+      setMesasSyncCount(rows.length)
+      setMesasCustom((prev) => [
+        ...prev.filter((m) => m.anio !== selectedYear),
+        ...(fresh as MesaCustomRow[]),
+      ])
+    }
+
+    setMesasSyncStatus('ok')
+  }
 
   async function sincronizarFAU() {
     setScraperStatus('loading')
@@ -171,6 +252,9 @@ export function GestionarCalendarioClient({
             setScraperStatus('idle')
             setScraperData(null)
             setScraperError(null)
+            setMesasSyncStatus('idle')
+            setMesasSyncData(null)
+            setMesasSyncError(null)
           }}>
             <SelectTrigger id="year-select" className="w-28">
               <SelectValue />
@@ -268,6 +352,94 @@ export function GestionarCalendarioClient({
           </p>
         </div>
       )}
+
+      {/* Sincronizar mesas desde FAU (Anexo III) */}
+      <div className="rounded-lg border bg-card p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="font-medium text-sm">Mesas por materia (Anexo III)</p>
+            <p className="text-xs text-muted-foreground">
+              Importá el cronograma de mesas de{' '}
+              <a
+                href="https://www.arq.unne.edu.ar/turno-examenes/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2"
+              >
+                arq.unne.edu.ar/turno-examenes
+                <ExternalLink className="inline ml-1 h-3 w-3" />
+              </a>
+            </p>
+          </div>
+          <Button
+            onClick={obtenerMesasFAU}
+            disabled={mesasSyncStatus === 'loading' || mesasSyncStatus === 'importing'}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+          >
+            {mesasSyncStatus === 'loading' ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Download className="h-3.5 w-3.5" />
+            )}
+            Obtener mesas desde FAU
+          </Button>
+        </div>
+
+        {/* Preview de datos scrapeados */}
+        {(mesasSyncStatus === 'preview' || mesasSyncStatus === 'importing') && mesasSyncData && (
+          <div className="rounded-md border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/20 p-3 space-y-2">
+            <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300 text-sm font-medium">
+              <CheckCircle2 className="h-4 w-4" />
+              Datos encontrados: {mesasSyncData.anio} — {mesasSyncData.mesas.filter((m) => m.materiaId).length} materias × {mesasSyncData.turnos.length} turnos
+            </div>
+            {mesasSyncData.anio !== selectedYear ? (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                ⚠️ La FAU publicó datos para <strong>{mesasSyncData.anio}</strong>, pero tenés seleccionado <strong>{selectedYear}</strong>.
+                Solo podés importar cuando el año coincida.
+              </p>
+            ) : selectedYear < 2027 ? (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                ⚠️ La importación manual solo está disponible para años 2027 en adelante.
+                Para 2026 los datos se usan automáticamente en el calendario.
+              </p>
+            ) : (
+              <div className="flex items-center gap-3">
+                <p className="text-xs text-blue-600 dark:text-blue-400 flex-1">
+                  Se van a crear o actualizar registros en tu calendario de {selectedYear}.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={importarMesasFAU}
+                  disabled={mesasSyncStatus === 'importing'}
+                  className="shrink-0"
+                >
+                  {mesasSyncStatus === 'importing' ? (
+                    <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> Importando…</>
+                  ) : (
+                    'Importar mesas'
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {mesasSyncStatus === 'ok' && (
+          <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 text-sm">
+            <CheckCircle2 className="h-4 w-4" />
+            {mesasSyncCount} registros importados correctamente para {selectedYear}.
+          </div>
+        )}
+
+        {mesasSyncStatus === 'error' && mesasSyncError && (
+          <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 text-sm">
+            <AlertTriangle className="h-4 w-4" />
+            {mesasSyncError}
+          </div>
+        )}
+      </div>
 
       {/* Mesas cargadas */}
       <div className="space-y-3">

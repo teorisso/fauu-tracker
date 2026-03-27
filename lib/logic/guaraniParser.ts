@@ -209,22 +209,37 @@ export function parsearArchivoGuarani(buffer: ArrayBuffer): GuaraniMateria[] {
     const fechaReferencia = fecha_aprobacion ?? fecha_regularidad
     const fechaData = fechaReferencia ? fechaToAnioYCuatrimestre(fechaReferencia) : null
 
-    const materiaId = GUARANI_CODE_MAP[code] ?? null
+    const mapped = GUARANI_CODE_MAP[code]
+    const materiaIds: (string | null)[] = mapped == null
+      ? [null]
+      : Array.isArray(mapped) ? mapped : [mapped]
 
-    materias.push({
-      codigoGuarani: code,
-      nombreGuarani: nombre,
-      materiaId,
-      estadoDetectado: mejorEstado,
-      nota,
-      fecha_regularidad,
-      fecha_aprobacion,
-      anio_cursado: fechaData?.anio,
-      cuatrimestre: fechaData?.cuatrimestre,
-      intentos_previos: intentos,
-      esOptativo: materiaId === null,
-    })
+    for (const materiaId of materiaIds) {
+      materias.push({
+        codigoGuarani: code,
+        nombreGuarani: nombre,
+        materiaId,
+        estadoDetectado: mejorEstado,
+        nota,
+        fecha_regularidad,
+        fecha_aprobacion,
+        anio_cursado: fechaData?.anio,
+        cuatrimestre: fechaData?.cuatrimestre,
+        intentos_previos: intentos,
+        esOptativo: materiaId === null,
+      })
+    }
   }
 
-  return materias
+  // Deduplicar por materiaId: si el plan viejo y el nuevo registran la misma materia,
+  // conservar la entrada con el estado de mayor prioridad.
+  const deduped = new Map<string | null, GuaraniMateria>()
+  for (const m of materias) {
+    const existing = deduped.get(m.materiaId)
+    if (!existing || ESTADO_PRIORIDAD[m.estadoDetectado] > ESTADO_PRIORIDAD[existing.estadoDetectado]) {
+      deduped.set(m.materiaId, m)
+    }
+  }
+
+  return Array.from(deduped.values())
 }
