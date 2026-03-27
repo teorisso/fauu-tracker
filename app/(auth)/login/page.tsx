@@ -58,9 +58,14 @@ function LoginForm() {
 
   useEffect(() => {
     const errorParam = searchParams.get('error')
+    if (!errorParam) return
     if (errorParam === 'auth') {
       setError('Error de autenticación. Intentá de nuevo.')
-    } else if (errorParam) {
+    } else if (errorParam === 'oauth_failed') {
+      setError('No se pudo completar el inicio de sesión con Google. Intentá de nuevo.')
+    } else if (errorParam === 'link_expired') {
+      setError('El enlace de acceso expiró o ya fue usado. Solicitá uno nuevo.')
+    } else {
       setError(decodeURIComponent(errorParam))
     }
   }, [searchParams])

@@ -10,12 +10,16 @@ export default async function GestionarCalendarioPage() {
 
   if (!user) redirect('/login')
 
-  const { data: mesasCustom } = await supabase
+  const { data: mesasCustom, error: mesasError } = await supabase
     .from('mesas_custom')
     .select('*')
     .eq('user_id', user.id)
     .order('anio', { ascending: true })
     .order('turno_numero', { ascending: true })
+
+  if (mesasError) {
+    console.error('[calendario/gestionar] Error al cargar mesas custom:', mesasError.message)
+  }
 
   return (
     <div className="mx-auto max-w-5xl p-4 md:p-6">

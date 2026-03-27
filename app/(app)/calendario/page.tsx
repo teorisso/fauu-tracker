@@ -12,10 +12,14 @@ export default async function CalendarioPage() {
 
   if (!user) redirect('/login')
 
-  const { data: rawEstados } = await supabase
+  const { data: rawEstados, error: estadosError } = await supabase
     .from('materia_estados')
     .select('*')
     .eq('user_id', user.id)
+
+  if (estadosError) {
+    console.error('[calendario] Error al cargar estados:', estadosError.message)
+  }
 
   const estados: Record<string, MateriaEstado> = {}
   if (rawEstados) {
@@ -34,11 +38,15 @@ export default async function CalendarioPage() {
     }
   }
 
-  const { data: rawMesas } = await supabase
+  const { data: rawMesas, error: mesasError } = await supabase
     .from('mesas_usuario')
     .select('materia_id, fecha, anotado, condicion')
     .eq('user_id', user.id)
     .eq('anotado', true)
+
+  if (mesasError) {
+    console.error('[calendario] Error al cargar mesas anotadas:', mesasError.message)
+  }
 
   const mesasAnotadas: Record<string, MesaAnotadaInfo> = {}
   if (rawMesas) {
