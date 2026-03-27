@@ -1,57 +1,63 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// Rutas que requieren sesión activa; cualquier otra URL desconocida llegará
+// al not-found de Next (nunca se redirige a login por error tipográfico).
+const PROTECTED_PATH_PREFIXES = [
+  '/materias',
+  '/calendario',
+  '/perfil',
+]
+
+function isProtectedPath(pathname: string): boolean {
+  return PROTECTED_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  )
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          )
-          supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
-        },
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('[middleware] Variables de entorno de Supabase no configuradas')
+    return supabaseResponse
+  }
+
+  const supabase = createServerClient(supabaseUrl, supabaseKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll()
       },
-    }
-  )
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) =>
+          request.cookies.set(name, value)
+        )
+        supabaseResponse = NextResponse.next({ request })
+        cookiesToSet.forEach(({ name, value, options }) =>
+          supabaseResponse.cookies.set(name, value, options)
+        )
+      },
+    },
+  })
 
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   const pathname = request.nextUrl.pathname
-  const isPublicRoute =
-    pathname === '/' ||
-    pathname === '/login' ||
-    pathname.startsWith('/callback')
 
-  if (!user && !isPublicRoute) {
+  // Ruta protegida sin sesión → redirigir a login
+  if (!user && isProtectedPath(pathname)) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  if (user && (pathname === '/login' || pathname.startsWith('/callback'))) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/materias'
-    return NextResponse.redirect(url)
-  }
-
-  // Si el usuario ya está logueado y entra a la landing, mandarlo al dashboard
-  if (user && pathname === '/') {
-    // #region agent log
-    fetch('http://127.0.0.1:7697/ingest/e080e4ee-63b6-4399-b44a-e2083cc27737',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'260da6'},body:JSON.stringify({sessionId:'260da6',location:'lib/supabase/middleware.ts:51',message:'redirect_authenticated_root_to_materias',data:{pathname},hypothesisId:'H1-H3',timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
+  // Usuario autenticado intentando acceder a auth o landing → redirigir al dashboard
+  if (user && (pathname === '/login' || pathname.startsWith('/callback') || pathname === '/')) {
     const url = request.nextUrl.clone()
     url.pathname = '/materias'
     return NextResponse.redirect(url)

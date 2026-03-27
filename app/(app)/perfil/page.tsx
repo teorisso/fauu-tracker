@@ -14,10 +14,14 @@ export default async function PerfilPage() {
 
   if (!user) redirect('/login')
 
-  const { data: rawEstados } = await supabase
+  const { data: rawEstados, error: estadosError } = await supabase
     .from('materia_estados')
     .select('*')
     .eq('user_id', user.id)
+
+  if (estadosError) {
+    console.error('[perfil] Error al cargar estados:', estadosError.message)
+  }
 
   const estadosActuales: Record<string, MateriaEstado> = {}
   if (rawEstados) {
@@ -36,12 +40,15 @@ export default async function PerfilPage() {
     }
   }
 
-  // Preferencias de notificacion
-  const { data: notifPrefs } = await supabase
+  const { data: notifPrefs, error: notifError } = await supabase
     .from('notification_preferences')
     .select('*')
     .eq('user_id', user.id)
     .maybeSingle()
+
+  if (notifError) {
+    console.error('[perfil] Error al cargar preferencias de notificación:', notifError.message)
+  }
 
   // Materias con regularidad vigente (o vencida) que pueden tener vencimiento
   const materiasConRegularidad = MATERIAS.filter((m) => {

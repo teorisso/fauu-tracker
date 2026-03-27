@@ -2,11 +2,27 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { type EmailOtpType } from '@supabase/supabase-js'
 
+/**
+ * Valida que el parámetro `next` sea una ruta interna relativa para evitar
+ * open redirect. Solo acepta paths que empiezan con `/` y no tienen protocolo.
+ */
+function safeNextPath(next: string | null): string {
+  if (!next) return '/materias'
+  if (
+    !next.startsWith('/') ||
+    next.startsWith('//') ||
+    next.includes('://')
+  ) {
+    return '/materias'
+  }
+  return next
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
-  const next = searchParams.get('next') ?? '/materias'
+  const nextPath = safeNextPath(searchParams.get('next'))
 
-  // Supabase sends error params directly when the link is invalid/expired
+  // Supabase envía error params directamente cuando el link es inválido o expiró
   const errorParam = searchParams.get('error_description')
   if (errorParam) {
     const message = encodeURIComponent(errorParam)
@@ -19,21 +35,26 @@ export async function GET(request: Request) {
 
   const supabase = createClient()
 
-  // OAuth flow (Google) — exchanges authorization code for session
+  // Flujo OAuth (Google) — intercambia el código de autorización por sesión
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
+      return NextResponse.redirect(`${origin}${nextPath}`)
     }
+    console.error('[callback] exchangeCodeForSession falló:', error.message)
+    return NextResponse.redirect(`${origin}/login?error=oauth_failed`)
   }
 
-  // Magic link flow — verifies the OTP token hash
+  // Flujo magic link — verifica el token hash OTP
   if (token_hash && type) {
     const { error } = await supabase.auth.verifyOtp({ token_hash, type })
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
+      return NextResponse.redirect(`${origin}${nextPath}`)
     }
+    console.error('[callback] verifyOtp falló:', error.message)
+    return NextResponse.redirect(`${origin}/login?error=link_expired`)
   }
 
+  // Parámetros de auth ausentes o inválidos
   return NextResponse.redirect(`${origin}/login?error=auth`)
 }
