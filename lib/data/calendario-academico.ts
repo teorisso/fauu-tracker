@@ -256,3 +256,41 @@ export function getFechasMesaParaMateria(materiaId: string): { turno: TurnoExame
 
   return resultado.sort((a, b) => a.fecha.localeCompare(b.fecha))
 }
+
+/**
+ * Obtiene los datos de mesas para un año dado.
+ *
+ * Intenta scrapear `/api/mesas-fau` (datos en vivo de la FAU).
+ * Si falla o el año scrapeado no coincide, cae al fallback:
+ *   - 2026 → datos hardcodeados (TURNOS_2026 + MESAS_ARQ)
+ *   - otros años → arrays vacíos
+ *
+ * ⚠️ Solo apta para llamadas desde el browser (client components).
+ */
+export async function getMesasData(anio: number): Promise<{
+  turnos: TurnoExamen[]
+  mesas: MesaExamen[]
+  source: 'scraper' | 'hardcoded'
+}> {
+  try {
+    const res = await fetch('/api/mesas-fau')
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = await res.json() as { anio?: number; turnos?: TurnoExamen[]; mesas?: MesaExamen[] }
+
+    if (
+      data.anio === anio &&
+      Array.isArray(data.turnos) && data.turnos.length > 0 &&
+      Array.isArray(data.mesas) && data.mesas.length > 0
+    ) {
+      return { turnos: data.turnos, mesas: data.mesas, source: 'scraper' }
+    }
+  } catch {
+    // silencioso — caer al fallback
+  }
+
+  if (anio === 2026) {
+    return { turnos: TURNOS_2026, mesas: MESAS_ARQ, source: 'hardcoded' }
+  }
+
+  return { turnos: [], mesas: [], source: 'hardcoded' }
+}

@@ -7,6 +7,8 @@ import {
   TURNOS_2026,
   MESAS_ARQ,
   calcularFechaMesa,
+  type TurnoExamen,
+  type MesaExamen,
 } from '@/lib/data/calendario-academico'
 import { validarCorrelatividades } from '@/lib/logic/correlatividades'
 import { createClient } from '@/lib/supabase/client'
@@ -32,6 +34,10 @@ interface CalendarioMesasProps {
   userId: string
   estados: Record<string, MateriaEstado>
   mesasAnotadasInit: Record<string, MesaAnotadaInfo>
+  /** Lista de turnos a usar. Default: TURNOS_2026 hardcodeado. */
+  turnos?: TurnoExamen[]
+  /** Lista de mesas a usar. Default: MESAS_ARQ hardcodeado. */
+  mesas?: MesaExamen[]
 }
 
 interface ResultadoRendir {
@@ -103,15 +109,29 @@ function getMesasBadgeClass(condicion?: 'regular' | 'libre'): string {
   return 'border-border bg-muted/50 opacity-60'
 }
 
-export function CalendarioMesas({ userId, estados, mesasAnotadasInit }: CalendarioMesasProps) {
+export function CalendarioMesas({
+  userId,
+  estados,
+  mesasAnotadasInit,
+  turnos = TURNOS_2026,
+  mesas = MESAS_ARQ,
+}: CalendarioMesasProps) {
   const [mesasAnotadas, setMesasAnotadas] = useState<Record<string, MesaAnotadaInfo>>(mesasAnotadasInit)
   const [selectedTurno, setSelectedTurno] = useState<number>(
-    TURNOS_2026.find((t) => new Date(t.fechaFin) >= new Date())?.numero ?? TURNOS_2026[0].numero
+    turnos.find((t) => new Date(t.fechaFin) >= new Date())?.numero ?? turnos[0]?.numero ?? 1
   )
 
-  const turno = TURNOS_2026.find((t) => t.numero === selectedTurno)!
+  const turno = turnos.find((t) => t.numero === selectedTurno) ?? turnos[0]
 
-  const mesasDelTurno: MesaConFecha[] = MESAS_ARQ.filter((m) => m.materiaId).flatMap((mesa) => {
+  if (!turno) {
+    return (
+      <div className="py-10 text-center text-sm text-muted-foreground">
+        No hay datos de turnos disponibles.
+      </div>
+    )
+  }
+
+  const mesasDelTurno: MesaConFecha[] = mesas.filter((m) => m.materiaId).flatMap((mesa) => {
     const fecha = calcularFechaMesa(turno, mesa.diaSemana)
     if (!fecha) return []
     return [{
@@ -297,7 +317,7 @@ export function CalendarioMesas({ userId, estados, mesasAnotadasInit }: Calendar
     <div className="space-y-6">
       {/* Selector de turno */}
       <div className="flex flex-wrap gap-2">
-        {TURNOS_2026.map((t) => {
+        {turnos.map((t) => {
           const pasado = new Date(t.fechaFin) < new Date()
           return (
             <button
@@ -325,10 +345,16 @@ export function CalendarioMesas({ userId, estados, mesasAnotadasInit }: Calendar
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="font-semibold">{turno.nombre}</h3>
-            <p className="text-sm text-muted-foreground">
-              Inscripción: {formatFechaCorta(turno.inscripcionDesde)} al{' '}
-              {formatFechaCorta(turno.inscripcionHasta)}
-            </p>
+            {turno.inscripcionDesde ? (
+              <p className="text-sm text-muted-foreground">
+                Inscripción: {formatFechaCorta(turno.inscripcionDesde)} al{' '}
+                {formatFechaCorta(turno.inscripcionHasta)}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {formatFechaCorta(turno.fechaInicio)} – {formatFechaCorta(turno.fechaFin)}
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap gap-2 items-center">
             {turno.suspensionClases && (

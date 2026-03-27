@@ -1,15 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { CalendarioMesas, type MesaAnotadaInfo } from './CalendarioMesas'
 import { CalendarMonthGrid } from './CalendarMonthGrid'
 import { CalendarTimeline } from './CalendarTimeline'
 import { CalendarViewToggle, type CalendarView } from './CalendarViewToggle'
 import { CountdownBanner } from '@/components/CountdownBanner'
 import { MateriaEstado } from '@/lib/types'
+import {
+  TURNOS_2026,
+  MESAS_ARQ,
+  getMesasData,
+  type TurnoExamen,
+  type MesaExamen,
+} from '@/lib/data/calendario-academico'
 import { Settings2 } from 'lucide-react'
 import NextLink from 'next/link'
 import { Button } from '@/components/ui/button'
+
+const ANIO = 2026
 
 interface CalendarioPageClientProps {
   userId: string
@@ -23,6 +32,17 @@ export function CalendarioPageClient({
   mesasAnotadasInit,
 }: CalendarioPageClientProps) {
   const [view, setView] = useState<CalendarView>('lista')
+  const [turnos, setTurnos] = useState<TurnoExamen[]>(TURNOS_2026)
+  const [mesas, setMesas] = useState<MesaExamen[]>(MESAS_ARQ)
+
+  useEffect(() => {
+    getMesasData(ANIO).then(({ turnos: t, mesas: m, source }) => {
+      if (source === 'scraper') {
+        setTurnos(t)
+        setMesas(m)
+      }
+    })
+  }, [])
 
   // Simple estado map for CalendarMonthGrid (only needs estado + vencimiento)
   const estadoMap: Record<string, { estado: string; vencimiento_regularidad?: string }> = {}
@@ -34,7 +54,7 @@ export function CalendarioPageClient({
     <div className="mx-auto max-w-5xl p-4 md:p-6">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Calendario de Mesas 2026</h1>
+          <h1 className="text-2xl font-bold">Calendario de Mesas {ANIO}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Mesas de examen de Arquitectura Plan 2018 — FAU UNNE.
           </p>
@@ -58,6 +78,8 @@ export function CalendarioPageClient({
             userId={userId}
             estados={estados}
             mesasAnotadasInit={mesasAnotadasInit}
+            turnos={turnos}
+            mesas={mesas}
           />
         )}
 
