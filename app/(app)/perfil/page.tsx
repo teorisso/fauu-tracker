@@ -5,6 +5,7 @@ import { GuaraniImport } from '@/components/guarani/GuaraniImport'
 import { VencimientoEditor } from '@/components/guarani/VencimientoEditor'
 import { NotificationPrefs } from '@/components/perfil/NotificationPrefs'
 import { MATERIAS } from '@/lib/data/materias'
+import { parseAlertRules } from '@/lib/notifications'
 
 export default async function PerfilPage() {
   const supabase = createClient()
@@ -50,6 +51,11 @@ export default async function PerfilPage() {
     console.error('[perfil] Error al cargar preferencias de notificación:', notifError.message)
   }
 
+  const { count: pushSubCount } = await supabase
+    .from('push_subscriptions')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+
   // Materias con regularidad vigente (o vencida) que pueden tener vencimiento
   const materiasConRegularidad = MATERIAS.filter((m) => {
     const e = estadosActuales[m.id]
@@ -93,21 +99,17 @@ export default async function PerfilPage() {
 
       <section className="space-y-4">
         <div>
-          <h2 className="text-lg font-semibold">Notificaciones por email</h2>
+          <h2 className="text-lg font-semibold">Alertas y notificaciones</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Recibí un aviso por email cuando alguna regularidad esté próxima a vencer.
+            Configurá recordatorios por correo o por notificación del navegador para vencimientos de
+            regularidad y para las mesas en las que te anotaste.
           </p>
         </div>
         <NotificationPrefs
           userId={user.id}
-          initialEmailEnabled={notifPrefs?.email_vencimientos ?? true}
-          initialDiasAnticipacion={
-            Array.isArray(notifPrefs?.dias_anticipacion)
-              ? (notifPrefs.dias_anticipacion as number[])
-              : notifPrefs?.dias_anticipacion != null
-                ? [notifPrefs.dias_anticipacion as unknown as number]
-                : [60]
-          }
+          initialAlertRules={parseAlertRules(notifPrefs?.alert_rules)}
+          initialPushSubscriptionCount={pushSubCount ?? 0}
+          vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY}
         />
       </section>
 

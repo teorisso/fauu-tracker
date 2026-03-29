@@ -75,7 +75,7 @@ const FEATURES = [
   {
     icon: Bell,
     title: 'Notificaciones',
-    desc: 'Recibí alertas por email cuando se acercan las fechas de vencimiento de regularidad.',
+    desc: 'Alertas por correo o navegador para regularidad y mesas anotadas, con anticipación en días o semanas.',
   },
 ]
 
