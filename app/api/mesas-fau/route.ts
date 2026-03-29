@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { scrapeMesasFAU } from '@/lib/logic/mesasScraper'
 import type { TurnoExamen, MesaExamen } from '@/lib/data/calendario-academico'
 
@@ -12,6 +13,13 @@ export interface MesasFAUData {
 export const revalidate = 86400 // 24 horas
 
 export async function GET() {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+
   try {
     const data = await scrapeMesasFAU()
     const response: MesasFAUData = {

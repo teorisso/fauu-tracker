@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
 export interface FeriadoFAU {
   date: string
@@ -36,6 +37,13 @@ export async function GET(
   _request: Request,
   { params }: { params: { year: string } }
 ) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+
   const year = parseInt(params.year, 10)
 
   if (isNaN(year) || year < 2026 || year > 2030) {

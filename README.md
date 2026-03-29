@@ -6,7 +6,8 @@ Seguimiento de progreso académico para la carrera de Arquitectura Plan 2018 —
 
 - Dashboard de materias con estados (sin cursar, cursando, regular, aprobada)
 - Importación desde SIU Guaraní (`historia_academica.xls`)
-- Control de vencimientos de regularidad con alertas por email
+- Control de vencimientos de regularidad con **alertas configurables** (correo y/o notificación del navegador)
+- Recordatorios para **mesas en las que te anotaste** (próxima fecha por materia)
 - Calendario de mesas de examen 2026 con inscripción planificada
 - Seminarios optativos configurables
 - Tema claro/oscuro
@@ -52,6 +53,7 @@ npm run dev
 | `NEXT_PUBLIC_SUPABASE_URL` | URL del proyecto Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clave anónima pública de Supabase |
 | `NEXT_PUBLIC_APP_URL` | URL de producción (ej: `https://fauu-tracker.vercel.app`) |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Clave **pública** VAPID para Web Push (ver abajo) |
 
 4. En el Dashboard de Supabase → Authentication → URL Configuration:
    - **Site URL**: `https://fauu-tracker.vercel.app`
@@ -59,15 +61,38 @@ npm run dev
 
 5. Vercel detecta Next.js automáticamente — no requiere configuración adicional.
 
-## Notificaciones por email (Edge Function)
+## Alertas (Edge Function `check-vencimientos`)
 
-La función `check-vencimientos` debe deployarse por separado:
+La función revisa **una vez al día** (cron en Supabase) vencimientos de regularidad y próximas mesas anotadas. Las reglas se guardan en `notification_preferences.alert_rules` (anticipación en **días** o **semanas**, canal **email** o **push**). Los envíos se deduplican con la tabla `notification_deliveries`.
 
-```bash
-npx supabase functions deploy check-vencimientos
-```
+### Zona horaria
 
-Luego configurar un cron job en Supabase (Dashboard → Edge Functions → Schedules) para que se ejecute diariamente.
+Los “días hasta el evento” se calculan con la fecha civil en **`America/Argentina/Cordoba`**, alineado al uso en la UNNE (Resistencia, Chaco).
+
+### Web Push (VAPID)
+
+1. Generar un par de claves (en cualquier máquina con Node):
+
+   ```bash
+   npx web-push generate-vapid-keys
+   ```
+
+2. **Vercel / `.env.local`**: `NEXT_PUBLIC_VAPID_PUBLIC_KEY` = clave pública.
+
+3. **Supabase** (secrets de la Edge Function, no commitear):
+   - `VAPID_PUBLIC_KEY` = misma clave pública
+   - `VAPID_PRIVATE_KEY` = clave privada
+   - `VAPID_SUBJECT` = `mailto:tu-email@ejemplo.com` (contacto del propietario del push)
+
+4. Deploy de la función:
+
+   ```bash
+   npx supabase functions deploy check-vencimientos
+   ```
+
+5. **Cron**: en Supabase → Edge Functions → **Schedules**, programar `check-vencimientos` **diariamente** (hora según preferencia).
+
+La clave privada **no** debe ir en el frontend; solo la pública (`NEXT_PUBLIC_VAPID_PUBLIC_KEY`) para suscribir el navegador.
 
 ---
 
