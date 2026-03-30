@@ -12,7 +12,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { getOrRegisterServiceWorker, urlBase64ToUint8Array } from '@/lib/push-client'
+import {
+  formatPushSubscribeError,
+  getOrRegisterServiceWorker,
+  parseVapidApplicationServerKey,
+} from '@/lib/push-client'
 import { type AlertRule, DEFAULT_ALERT_RULES } from '@/lib/notifications'
 import { Save, Bell, X, Plus } from 'lucide-react'
 
@@ -104,9 +108,23 @@ export function NotificationPrefs({
         setPushBusy(false)
         return
       }
+      await navigator.serviceWorker.ready
+
+      const parsed = parseVapidApplicationServerKey(vapidPublicKey)
+      if (!parsed.ok) {
+        setPushError(parsed.error)
+        setPushBusy(false)
+        return
+      }
+
+      const existing = await reg.pushManager.getSubscription()
+      if (existing) {
+        await existing.unsubscribe()
+      }
+
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as BufferSource,
+        applicationServerKey: parsed.key as BufferSource,
       })
       const j = sub.toJSON()
       if (!j.endpoint || !j.keys?.p256dh || !j.keys?.auth) {
@@ -135,7 +153,7 @@ export function NotificationPrefs({
         .eq('user_id', userId)
       setPushCount(count ?? 1)
     } catch (e) {
-      setPushError(e instanceof Error ? e.message : 'Error al activar push')
+      setPushError(formatPushSubscribeError(e))
     }
     setPushBusy(false)
   }
