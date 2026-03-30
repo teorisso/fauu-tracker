@@ -53,7 +53,8 @@ npm run dev
 | `NEXT_PUBLIC_SUPABASE_URL` | URL del proyecto Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clave anónima pública de Supabase |
 | `NEXT_PUBLIC_APP_URL` | URL de producción (ej: `https://fauu-tracker.vercel.app`) |
-| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Clave **pública** VAPID para Web Push (ver abajo) |
+| `VAPID_PUBLIC_KEY` | Clave **pública** VAPID (recomendada; se sirve en runtime vía `/api/vapid-public`) |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Alternativa: misma clave pública (se inyecta al build; si falla el push, usá `VAPID_PUBLIC_KEY`) |
 
 4. En el Dashboard de Supabase → Authentication → URL Configuration:
    - **Site URL**: `https://fauu-tracker.vercel.app`
@@ -77,7 +78,7 @@ Los “días hasta el evento” se calculan con la fecha civil en **`America/Arg
    npx web-push generate-vapid-keys
    ```
 
-2. **Vercel / `.env.local`**: `NEXT_PUBLIC_VAPID_PUBLIC_KEY` = clave pública.
+2. **Vercel / `.env.local`**: definí **`VAPID_PUBLIC_KEY`** = clave pública (recomendado; no depende del build del bundle). Podés usar también `NEXT_PUBLIC_VAPID_PUBLIC_KEY` como respaldo.
 
 3. **Supabase** (secrets de la Edge Function, no commitear):
    - `VAPID_PUBLIC_KEY` = misma clave pública
@@ -96,9 +97,9 @@ La clave privada **no** debe ir en el frontend; solo la pública (`NEXT_PUBLIC_V
 
 ### Si falla “push service error” o el registro en el navegador
 
-- En Vercel, el valor de `NEXT_PUBLIC_VAPID_PUBLIC_KEY` debe ser **una sola línea**, la Public Key completa, **sin comillas** ni espacios al inicio/final (si el panel agrega comillas al pegar, borralas).
-- Tras crear o cambiar esa variable, hacé un **nuevo deploy** (las variables `NEXT_PUBLIC_*` se fijan en tiempo de build).
-- La **misma** public key que en Vercel debe estar en Supabase como `VAPID_PUBLIC_KEY`, emparejada con su `VAPID_PRIVATE_KEY`.
+- En Vercel, agregá **`VAPID_PUBLIC_KEY`** (recomendado) con la Public Key en **una sola línea**, sin comillas. El cliente la obtiene por `/api/vapid-public` y evita problemas de variables `NEXT_PUBLIC_*` mal inyectadas al build.
+- Si solo usás `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, hacé **redeploy** tras cada cambio (se fija en tiempo de build).
+- La **misma** public key debe estar en Supabase como `VAPID_PUBLIC_KEY` (secrets de la Edge Function), emparejada con `VAPID_PRIVATE_KEY`.
 
 ---
 

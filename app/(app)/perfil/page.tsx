@@ -109,7 +109,6 @@ export default async function PerfilPage() {
           userId={user.id}
           initialAlertRules={parseAlertRules(notifPrefs?.alert_rules)}
           initialPushSubscriptionCount={pushSubCount ?? 0}
-          vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY}
         />
       </section>
 
