@@ -94,6 +94,12 @@ Los “días hasta el evento” se calculan con la fecha civil en **`America/Arg
 
 La clave privada **no** debe ir en el frontend; solo la pública (`NEXT_PUBLIC_VAPID_PUBLIC_KEY`) para suscribir el navegador.
 
+### Si falla “push service error” o el registro en el navegador
+
+- En Vercel, el valor de `NEXT_PUBLIC_VAPID_PUBLIC_KEY` debe ser **una sola línea**, la Public Key completa, **sin comillas** ni espacios al inicio/final (si el panel agrega comillas al pegar, borralas).
+- Tras crear o cambiar esa variable, hacé un **nuevo deploy** (las variables `NEXT_PUBLIC_*` se fijan en tiempo de build).
+- La **misma** public key que en Vercel debe estar en Supabase como `VAPID_PUBLIC_KEY`, emparejada con su `VAPID_PRIVATE_KEY`.
+
 ---
 
 Desarrollado por **Teo Risso** — Estudiante y desarrollador · FAU-UNNE
