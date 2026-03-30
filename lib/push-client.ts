@@ -80,9 +80,9 @@ export function formatPushSubscribeError(err: unknown): string {
     (lower.includes('networkerror') && lower.includes('push'))
   ) {
     return (
-      'No se pudo registrar el push en el navegador. Revisá que en Vercel ' +
-      '`NEXT_PUBLIC_VAPID_PUBLIC_KEY` sea exactamente la Public Key (una línea, sin comillas) y que ' +
-      'hayas hecho redeploy después de guardarla. La misma public key debe coincidir con el par usado en Supabase.'
+      'No se pudo registrar el push en el navegador. En Vercel configurá `VAPID_PUBLIC_KEY` con la Public Key ' +
+      '(una línea, sin comillas), redeploy, y comprobá en el navegador la URL `/api/vapid-public` (debe devolver JSON con publicKey). ' +
+      'La misma public key debe coincidir con el par en Supabase (VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY).'
     )
   }
   return msg

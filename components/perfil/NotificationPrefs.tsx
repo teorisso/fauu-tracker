@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,14 +24,12 @@ interface NotificationPrefsProps {
   userId: string
   initialAlertRules: AlertRule[]
   initialPushSubscriptionCount: number
-  vapidPublicKey: string | undefined
 }
 
 export function NotificationPrefs({
   userId,
   initialAlertRules,
   initialPushSubscriptionCount,
-  vapidPublicKey,
 }: NotificationPrefsProps) {
   const [rules, setRules] = useState<AlertRule[]>(
     initialAlertRules.length > 0 ? initialAlertRules : [...DEFAULT_ALERT_RULES]
@@ -41,6 +39,30 @@ export function NotificationPrefs({
   const [pushCount, setPushCount] = useState(initialPushSubscriptionCount)
   const [pushBusy, setPushBusy] = useState(false)
   const [pushError, setPushError] = useState<string | null>(null)
+  /** Clave pública cargada desde GET /api/vapid-public (runtime; evita fallos de build con NEXT_PUBLIC_*). */
+  const [vapidPublicKey, setVapidPublicKey] = useState<string | null>(null)
+  const [vapidKeyLoading, setVapidKeyLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/vapid-public', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d: { publicKey: string | null }) => {
+        if (!cancelled) {
+          setVapidPublicKey(d.publicKey ?? null)
+          setVapidKeyLoading(false)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setVapidPublicKey(null)
+          setVapidKeyLoading(false)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function updateRule(index: number, patch: Partial<AlertRule>) {
     setRules((prev) => {
@@ -85,8 +107,15 @@ export function NotificationPrefs({
 
   async function enablePush() {
     setPushError(null)
-    if (!vapidPublicKey) {
-      setPushError('Falta configurar VAPID en el servidor.')
+    const key =
+      vapidPublicKey ??
+      (await fetch('/api/vapid-public', { cache: 'no-store' })
+        .then((r) => r.json())
+        .then((d: { publicKey: string | null }) => d.publicKey ?? null))
+    if (!key) {
+      setPushError(
+        'Falta la clave pública VAPID. En Vercel agregá la variable VAPID_PUBLIC_KEY (recomendado) o NEXT_PUBLIC_VAPID_PUBLIC_KEY con la Public Key en una sola línea, sin comillas, y volvé a desplegar.'
+      )
       return
     }
     if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
@@ -110,7 +139,7 @@ export function NotificationPrefs({
       }
       await navigator.serviceWorker.ready
 
-      const parsed = parseVapidApplicationServerKey(vapidPublicKey)
+      const parsed = parseVapidApplicationServerKey(key)
       if (!parsed.ok) {
         setPushError(parsed.error)
         setPushBusy(false)
@@ -293,7 +322,12 @@ export function NotificationPrefs({
               </Button>
             </>
           ) : (
-            <Button type="button" size="sm" onClick={enablePush} disabled={pushBusy || !vapidPublicKey}>
+            <Button
+              type="button"
+              size="sm"
+              onClick={enablePush}
+              disabled={pushBusy || vapidKeyLoading || !vapidPublicKey}
+            >
               {pushBusy ? 'Activando…' : 'Activar notificaciones en el navegador'}
             </Button>
           )}
