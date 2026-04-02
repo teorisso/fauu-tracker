@@ -37,7 +37,11 @@ export function parseVapidApplicationServerKey(raw: string):
   | { ok: false; error: string } {
   const s = sanitizeVapidPublicKey(raw)
   if (!s) {
-    return { ok: false, error: 'La clave VAPID pública está vacía. Revisá NEXT_PUBLIC_VAPID_PUBLIC_KEY.' }
+    return {
+      ok: false,
+      error:
+        'Las notificaciones del navegador no están disponibles en este momento. Intentá más tarde.',
+    }
   }
   let buf: Uint8Array
   try {
@@ -46,20 +50,21 @@ export function parseVapidApplicationServerKey(raw: string):
     return {
       ok: false,
       error:
-        'La clave VAPID no es base64 válido. Copiá la Public Key completa, una sola línea, sin comillas.',
+        'No pudimos activar las notificaciones. Probá de nuevo más tarde o con otro navegador.',
     }
   }
   if (buf.length !== VAPID_PUBLIC_UNCOMPRESSED_LENGTH) {
     return {
       ok: false,
-      error: `Clave VAPID pública inválida (${buf.length} bytes; se esperan ${VAPID_PUBLIC_UNCOMPRESSED_LENGTH}). Revisá Vercel: sin saltos de línea ni comillas dentro del valor.`,
+      error:
+        'No pudimos activar las notificaciones. Probá de nuevo más tarde o con otro navegador.',
     }
   }
   if (buf[0] !== 0x04) {
     return {
       ok: false,
       error:
-        'Formato de clave VAPID no reconocido. Usá el par generado con `npx web-push generate-vapid-keys`.',
+        'No pudimos activar las notificaciones. Probá de nuevo más tarde o con otro navegador.',
     }
   }
   return { ok: true, key: buf }
@@ -70,20 +75,65 @@ export async function getOrRegisterServiceWorker(): Promise<ServiceWorkerRegistr
   return navigator.serviceWorker.register('/sw.js', { scope: '/' })
 }
 
-/** Mensaje de ayuda cuando el navegador falla al hablar con el servicio de push (p. ej. FCM). */
-export function formatPushSubscribeError(err: unknown): string {
+type PushSubscribeErrorContext = {
+  notificationPermission?: NotificationPermission | 'unsupported'
+  userAgent?: string
+  isSecureContext?: boolean
+}
+
+/** Mensaje amigable cuando falla la suscripción al servicio de push del navegador. */
+export function formatPushSubscribeError(
+  err: unknown,
+  context?: PushSubscribeErrorContext
+): string {
   const msg = err instanceof Error ? err.message : String(err)
   const lower = msg.toLowerCase()
+  const permission = context?.notificationPermission
+  const userAgent = (context?.userAgent ?? '').toLowerCase()
+  const isChromium = userAgent.includes('chrome') || userAgent.includes('edg') || userAgent.includes('brave')
+
+  if (context?.isSecureContext === false) {
+    return 'No pudimos activar las notificaciones porque esta página no está en un contexto seguro (HTTPS).'
+  }
+
+  if (
+    permission === 'denied' ||
+    lower.includes('notallowederror') ||
+    lower.includes('permission denied') ||
+    lower.includes('permission has been denied')
+  ) {
+    return (
+      'Las notificaciones están bloqueadas en este navegador. Permitilas para este sitio y recargá la página. ' +
+      'Si estás en modo incógnito/privado, probá en una ventana normal.'
+    )
+  }
+
+  if (lower.includes('incognito') || lower.includes('private browsing')) {
+    return 'En modo incógnito/privado el navegador puede bloquear push. Probá activar en una ventana normal.'
+  }
+
   if (
     lower.includes('push service error') ||
     lower.includes('registration failed') ||
-    (lower.includes('networkerror') && lower.includes('push'))
+    (lower.includes('networkerror') && lower.includes('push')) ||
+    (lower.includes('network') && lower.includes('push')) ||
+    lower.includes('aborterror')
   ) {
+    if (isChromium) {
+      return (
+        'No pudimos registrar las notificaciones push en este navegador. Revisá permisos del sitio (candado -> Notificaciones: Permitir), ' +
+        'desactivá bloqueos estrictos de Brave Shields/Edge para este sitio y volvé a intentar en una ventana normal.'
+      )
+    }
     return (
-      'No se pudo registrar el push en el navegador. En Vercel configurá `VAPID_PUBLIC_KEY` con la Public Key ' +
-      '(una línea, sin comillas), redeploy, y comprobá en el navegador la URL `/api/vapid-public` (debe devolver JSON con publicKey). ' +
-      'La misma public key debe coincidir con el par en Supabase (VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY).'
+      'No pudimos activar las notificaciones en este dispositivo. Probá de nuevo más tarde, actualizá la página o usá otro navegador.'
     )
   }
-  return msg
+  if (isChromium) {
+    return (
+      'No pudimos activar las notificaciones. Si usás Brave o Edge, permití notificaciones para este sitio, ' +
+      'revisá Shields/prevención de rastreo y evitá modo incógnito.'
+    )
+  }
+  return 'No pudimos activar las notificaciones. Probá de nuevo más tarde.'
 }

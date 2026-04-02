@@ -336,8 +336,15 @@ serve(async () => {
       }
     }
 
+    // pushVapidConfigured: false → faltan VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY en secrets de la función
     return new Response(
-      JSON.stringify({ ok: true, emailsSent, pushSent, today }),
+      JSON.stringify({
+        ok: true,
+        emailsSent,
+        pushSent,
+        today,
+        pushVapidConfigured: pushOk,
+      }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     )
   } catch (err) {
