@@ -20,6 +20,22 @@ import {
 import { type AlertRule, DEFAULT_ALERT_RULES } from '@/lib/notifications'
 import { Save, Bell, X, Plus } from 'lucide-react'
 
+const VAPID_PUBLIC_ENDPOINTS = ['/api/vapid-public', '/api/push/vapid-public'] as const
+
+async function fetchVapidPublicKeyFromApi(): Promise<string | null> {
+  for (const endpoint of VAPID_PUBLIC_ENDPOINTS) {
+    try {
+      const res = await fetch(endpoint, { cache: 'no-store' })
+      if (!res.ok) continue
+      const data = (await res.json()) as { publicKey?: string | null }
+      if (data.publicKey) return data.publicKey
+    } catch {
+      // Intenta el endpoint de compatibilidad legacy.
+    }
+  }
+  return null
+}
+
 interface NotificationPrefsProps {
   userId: string
   initialAlertRules: AlertRule[]
@@ -39,17 +55,16 @@ export function NotificationPrefs({
   const [pushCount, setPushCount] = useState(initialPushSubscriptionCount)
   const [pushBusy, setPushBusy] = useState(false)
   const [pushError, setPushError] = useState<string | null>(null)
-  /** Clave pública cargada desde GET /api/vapid-public (runtime; evita fallos de build con NEXT_PUBLIC_*). */
+  /** Clave pública cargada en runtime desde la API (no depende del build). */
   const [vapidPublicKey, setVapidPublicKey] = useState<string | null>(null)
   const [vapidKeyLoading, setVapidKeyLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/vapid-public', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((d: { publicKey: string | null }) => {
+    fetchVapidPublicKeyFromApi()
+      .then((key) => {
         if (!cancelled) {
-          setVapidPublicKey(d.publicKey ?? null)
+          setVapidPublicKey(key)
           setVapidKeyLoading(false)
         }
       })
@@ -107,17 +122,14 @@ export function NotificationPrefs({
 
   async function enablePush() {
     setPushError(null)
-    const key =
-      vapidPublicKey ??
-      (await fetch('/api/vapid-public', { cache: 'no-store' })
-        .then((r) => r.json())
-        .then((d: { publicKey: string | null }) => d.publicKey ?? null))
+    const key = vapidPublicKey ?? (await fetchVapidPublicKeyFromApi())
     if (!key) {
       setPushError(
-        'Falta la clave pública VAPID. En Vercel agregá la variable VAPID_PUBLIC_KEY (recomendado) o NEXT_PUBLIC_VAPID_PUBLIC_KEY con la Public Key en una sola línea, sin comillas, y volvé a desplegar.'
+        'Las notificaciones del navegador no están disponibles en este momento. Intentá más tarde.'
       )
       return
     }
+    if (!vapidPublicKey) setVapidPublicKey(key)
     if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
       setPushError('Las notificaciones están bloqueadas en el navegador.')
       return
@@ -147,17 +159,15 @@ export function NotificationPrefs({
       }
 
       const existing = await reg.pushManager.getSubscription()
-      if (existing) {
-        await existing.unsubscribe()
-      }
-
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: parsed.key as BufferSource,
-      })
+      const sub =
+        existing ??
+        (await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: parsed.key as BufferSource,
+        }))
       const j = sub.toJSON()
       if (!j.endpoint || !j.keys?.p256dh || !j.keys?.auth) {
-        setPushError('No se pudo obtener la suscripción.')
+        setPushError('No pudimos completar la suscripción. Intentá de nuevo.')
         setPushBusy(false)
         return
       }
@@ -172,7 +182,8 @@ export function NotificationPrefs({
         { onConflict: 'endpoint' }
       )
       if (error) {
-        setPushError(error.message)
+        console.error(error)
+        setPushError('No pudimos guardar la suscripción. Intentá de nuevo.')
         setPushBusy(false)
         return
       }
@@ -182,7 +193,32 @@ export function NotificationPrefs({
         .eq('user_id', userId)
       setPushCount(count ?? 1)
     } catch (e) {
-      setPushError(formatPushSubscribeError(e))
+      const errorName =
+        typeof e === 'object' && e !== null && 'name' in e
+          ? String((e as { name?: unknown }).name)
+          : undefined
+      const errorMessage =
+        typeof e === 'object' && e !== null && 'message' in e
+          ? String((e as { message?: unknown }).message)
+          : String(e)
+
+      console.error('[push] enablePush failed', {
+        errorName,
+        errorMessage,
+        notificationPermission:
+          typeof Notification !== 'undefined' ? Notification.permission : 'unsupported',
+        isSecureContext: window.isSecureContext,
+        userAgent: navigator.userAgent,
+      })
+
+      setPushError(
+        formatPushSubscribeError(e, {
+          notificationPermission:
+            typeof Notification !== 'undefined' ? Notification.permission : 'unsupported',
+          userAgent: navigator.userAgent,
+          isSecureContext: window.isSecureContext,
+        })
+      )
     }
     setPushBusy(false)
   }
@@ -198,7 +234,8 @@ export function NotificationPrefs({
       if (sub) await sub.unsubscribe()
       setPushCount(0)
     } catch (e) {
-      setPushError(e instanceof Error ? e.message : 'Error al desactivar')
+      console.error(e)
+      setPushError('No pudimos desactivar las notificaciones. Intentá de nuevo.')
     }
     setPushBusy(false)
   }
@@ -307,10 +344,11 @@ export function NotificationPrefs({
       )}
 
       <div className="space-y-2 rounded-md border border-border p-4">
-        <h3 className="text-sm font-medium">Notificaciones en el navegador (push)</h3>
+        <h3 className="text-sm font-medium">Notificaciones en el navegador</h3>
         <p className="text-xs text-muted-foreground">
-          Requiere HTTPS en producción. En local, solo funciona en localhost con permiso del
-          navegador.
+          Recibí avisos aunque no tengas la página abierta. El navegador te pedirá permiso la primera
+          vez. Los envíos no son al instante: el sistema revisa vencimientos y mesas al menos una vez
+          al día y solo avisa cuando coinciden tus reglas de anticipación.
         </p>
         {pushError && <p className="text-sm text-destructive">{pushError}</p>}
         <div className="flex flex-wrap gap-2 items-center">
@@ -318,7 +356,7 @@ export function NotificationPrefs({
             <>
               <span className="text-sm text-muted-foreground">Suscripción activa.</span>
               <Button type="button" variant="outline" size="sm" onClick={disablePush} disabled={pushBusy}>
-                {pushBusy ? '…' : 'Desactivar push'}
+                {pushBusy ? '…' : 'Desactivar notificaciones'}
               </Button>
             </>
           ) : (

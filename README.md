@@ -101,6 +101,15 @@ La clave privada **no** debe ir en el frontend; solo la pública (`NEXT_PUBLIC_V
 - Si solo usás `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, hacé **redeploy** tras cada cambio (se fija en tiempo de build).
 - La **misma** public key debe estar en Supabase como `VAPID_PUBLIC_KEY` (secrets de la Edge Function), emparejada con `VAPID_PRIVATE_KEY`.
 
+#### Matriz rápida por navegador
+
+| Escenario | Comportamiento esperado | Qué revisar |
+| --- | --- | --- |
+| Chrome (ventana normal) | Debe permitir activar push | Permiso del sitio en `Permitir` |
+| Chrome incógnito | Puede aparecer bloqueado/no permitido | Probar en ventana normal |
+| Brave / Edge | Puede fallar por bloqueo estricto del navegador | Permitir notificaciones del sitio y desactivar Shields/prevención estricta para este dominio |
+| Cualquier navegador sin HTTPS | Push no funciona | Verificar que la URL sea `https://...` (o `localhost` en desarrollo) |
+
 ---
 
 Desarrollado por **Teo Risso** — Estudiante y desarrollador · FAU-UNNE
