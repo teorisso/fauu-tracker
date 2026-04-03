@@ -133,11 +133,11 @@ export function DashboardClient({
   )
 
   return (
-    <div className="flex min-h-[calc(100vh-57px)] md:min-h-screen">
+    <div className="flex h-[calc(100vh-57px)] h-[calc(100dvh-57px)] min-h-0">
       {/* Sidebar desktop — solo stats */}
-      <aside className="hidden w-72 shrink-0 border-r bg-muted/40 md:block">
-        <ScrollArea className="h-screen">
-          <div className="flex h-full flex-col p-4">
+      <aside className="hidden w-72 shrink-0 border-r bg-muted/40 md:block md:h-full md:min-h-0">
+        <ScrollArea className="h-full">
+          <div className="flex h-full min-h-0 flex-col p-4">
             <div className="border-b pb-3">
               <p className="text-xs text-muted-foreground">Arquitectura Plan 2018 · FAU-UNNE</p>
             </div>
@@ -152,7 +152,7 @@ export function DashboardClient({
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto p-4 md:p-6">
+      <main className="min-h-0 flex-1 overflow-auto p-4 md:p-6">
         <div className="mx-auto max-w-6xl space-y-5">
 
           {/* Stats compacto — solo mobile */}
