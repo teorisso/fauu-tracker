@@ -107,7 +107,7 @@ La clave privada **no** debe ir en el frontend; solo la pública (`NEXT_PUBLIC_V
 | --- | --- | --- |
 | Chrome (ventana normal) | Debe permitir activar push | Permiso del sitio en `Permitir` |
 | Chrome incógnito | Puede aparecer bloqueado/no permitido | Probar en ventana normal |
-| Brave / Edge | Puede fallar por bloqueo estricto del navegador | Permitir notificaciones del sitio y desactivar Shields/prevención estricta para este dominio |
+| Brave | Puede fallar con `push service error` aun con permiso concedido | Abrir `brave://settings/privacy` y activar `Use Google services for push messaging` |
 | Cualquier navegador sin HTTPS | Push no funciona | Verificar que la URL sea `https://...` (o `localhost` en desarrollo) |
 
 ---

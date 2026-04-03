@@ -121,8 +121,8 @@ export function formatPushSubscribeError(
   ) {
     if (isChromium) {
       return (
-        'No pudimos registrar las notificaciones push en este navegador. Revisá permisos del sitio (candado -> Notificaciones: Permitir), ' +
-        'desactivá bloqueos estrictos de Brave Shields/Edge para este sitio y volvé a intentar en una ventana normal.'
+        'No pudimos registrar las notificaciones push en este navegador. Revisá permisos del sitio (candado -> Notificaciones: Permitir). ' +
+        'Si usás Brave, abrí brave://settings/privacy y activá "Use Google services for push messaging".'
       )
     }
     return (
@@ -131,8 +131,7 @@ export function formatPushSubscribeError(
   }
   if (isChromium) {
     return (
-      'No pudimos activar las notificaciones. Si usás Brave o Edge, permití notificaciones para este sitio, ' +
-      'revisá Shields/prevención de rastreo y evitá modo incógnito.'
+      'No pudimos activar las notificaciones. Si usás Brave, abrí brave://settings/privacy y activá "Use Google services for push messaging".'
     )
   }
   return 'No pudimos activar las notificaciones. Probá de nuevo más tarde.'

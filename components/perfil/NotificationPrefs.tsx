@@ -21,6 +21,7 @@ import { type AlertRule, DEFAULT_ALERT_RULES } from '@/lib/notifications'
 import { Save, Bell, X, Plus } from 'lucide-react'
 
 const VAPID_PUBLIC_ENDPOINTS = ['/api/vapid-public', '/api/push/vapid-public'] as const
+const BRAVE_SETTINGS_URL = 'brave://settings/privacy'
 
 async function fetchVapidPublicKeyFromApi(): Promise<string | null> {
   for (const endpoint of VAPID_PUBLIC_ENDPOINTS) {
@@ -58,6 +59,20 @@ export function NotificationPrefs({
   /** Clave pública cargada en runtime desde la API (no depende del build). */
   const [vapidPublicKey, setVapidPublicKey] = useState<string | null>(null)
   const [vapidKeyLoading, setVapidKeyLoading] = useState(true)
+
+  function renderPushError(error: string) {
+    if (!error.includes(BRAVE_SETTINGS_URL)) return error
+    const [before, after] = error.split(BRAVE_SETTINGS_URL)
+    return (
+      <>
+        {before}
+        <a href={BRAVE_SETTINGS_URL} className="underline hover:no-underline">
+          {BRAVE_SETTINGS_URL}
+        </a>
+        {after}
+      </>
+    )
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -350,7 +365,7 @@ export function NotificationPrefs({
           vez. Los envíos no son al instante: el sistema revisa vencimientos y mesas al menos una vez
           al día y solo avisa cuando coinciden tus reglas de anticipación.
         </p>
-        {pushError && <p className="text-sm text-destructive">{pushError}</p>}
+        {pushError && <p className="text-sm text-destructive">{renderPushError(pushError)}</p>}
         <div className="flex flex-wrap gap-2 items-center">
           {pushConfigured ? (
             <>
