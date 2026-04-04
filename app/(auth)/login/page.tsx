@@ -111,6 +111,10 @@ function LoginForm() {
         <form action={signInWithGoogle}>
           <GoogleSubmitButton />
         </form>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Se abrirá Google para continuar. Puede aparecer *.supabase.co porque
+          usamos Supabase Auth como proveedor seguro.
+        </p>
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">

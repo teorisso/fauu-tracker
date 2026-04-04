@@ -62,6 +62,30 @@ npm run dev
 
 5. Vercel detecta Next.js automáticamente — no requiere configuración adicional.
 
+## Branding gratis de Google Login
+
+Podés mejorar la confianza visual del inicio de sesión con Google sin costo, aunque manteniendo el dominio por defecto de Supabase.
+
+1. En Google Cloud Console, abrí **APIs & Services → OAuth consent screen**.
+2. Configurá estos campos:
+   - **App name** (ej. `FAUU Tracker`)
+   - **App logo**
+   - **User support email**
+   - **Developer contact information**
+3. Guardá y publicá los cambios de la pantalla de consentimiento.
+4. Verificá en el login que se muestre el nombre y logo correcto de tu app.
+
+### Limitación en plan gratuito
+
+En el selector de cuenta de Google puede seguir apareciendo `*.supabase.co` (por ejemplo `fwebpajsdovqxudxnuky.supabase.co`) porque ese es el dominio de callback OAuth del proyecto Supabase en plan gratis.
+
+### Checklist rápido (sin costo)
+
+- Nombre de app consistente: `FAUU Tracker` en Google Cloud y en la UI del sitio.
+- Logo cargado en OAuth consent screen.
+- Email de soporte visible y vigente.
+- Aviso en pantalla de login indicando que puede verse `*.supabase.co`.
+
 ## Alertas (Edge Function `check-vencimientos`)
 
 La función revisa **una vez al día** (cron en Supabase) vencimientos de regularidad y próximas mesas anotadas. Las reglas se guardan en `notification_preferences.alert_rules` (anticipación en **días** o **semanas**, canal **email** o **push**). Los envíos se deduplican con la tabla `notification_deliveries`.
