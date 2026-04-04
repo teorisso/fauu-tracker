@@ -65,3 +65,20 @@ export interface UserProfile {
   nombre_completo?: string
   carrera_completada: boolean
 }
+
+// Gamificación
+export type LogroCategoria = 'anio' | 'cantidad' | 'ciclo' | 'especial'
+
+export interface Logro {
+  id: string
+  nombre: string
+  emoji: string
+  descripcion: string
+  categoria: LogroCategoria
+  orden: number // para ordenar dentro de categoría
+}
+
+export interface LogroDesbloqueado {
+  logro: Logro
+  desbloqueado: boolean
+}

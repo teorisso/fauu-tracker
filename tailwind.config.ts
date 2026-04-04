@@ -55,7 +55,18 @@ const config: Config = {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
-  		}
+  		},
+  		keyframes: {
+  			'bounce-once': {
+  				'0%, 100%': { transform: 'translateY(0)' },
+  				'30%': { transform: 'translateY(-6px)' },
+  				'50%': { transform: 'translateY(0)' },
+  				'70%': { transform: 'translateY(-3px)' },
+  			},
+  		},
+  		animation: {
+  			'bounce-once': 'bounce-once 0.6s ease-in-out',
+  		},
   	}
   },
   plugins: [require("tailwindcss-animate")],

@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { MATERIAS, HORAS_TOTALES_OBLIGATORIAS } from '@/lib/data/materias'
 import { MateriaEstado, UserProfile, Estado, Ciclo, Seminario } from '@/lib/types'
 import { calcularPromedio, calcularHorasAcreditadas } from '@/lib/logic/promedios'
 import { calcularProyeccion } from '@/lib/logic/proyeccion'
 import { getVencimientoInfo } from '@/lib/logic/vencimientos'
+import { calcularLogros } from '@/lib/logic/logros'
 import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
 import { createClient } from '@/lib/supabase/client'
@@ -230,6 +231,48 @@ export function StatsPanel({ profile, estados, seminarios }: StatsPanelProps) {
           <Progress value={Math.round((semAprobados / 3) * 100)} className="h-1.5" />
         </div>
       </div>
+
+      {/* Logros — mini counter */}
+      <LogrosMiniCounter estados={estados} seminarios={seminarios} />
     </div>
+  )
+}
+
+/** Compact logro badge for sidebar — links to perfil for full view */
+function LogrosMiniCounter({
+  estados,
+  seminarios,
+}: {
+  estados: Record<string, MateriaEstado>
+  seminarios: Seminario[]
+}) {
+  const logros = useMemo(
+    () => calcularLogros(estados, seminarios),
+    [estados, seminarios]
+  )
+  const desbloqueados = logros.filter((l) => l.desbloqueado)
+  const total = logros.length
+
+  return (
+    <Link
+      href="/perfil"
+      className="flex items-center justify-between rounded-lg border bg-muted/40 px-3 py-2 transition-colors hover:bg-muted/70"
+    >
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">🏅 Logros</span>
+        {desbloqueados.length > 0 && (
+          <span className="flex gap-0.5">
+            {desbloqueados.slice(0, 5).map((l) => (
+              <span key={l.logro.id} className="text-xs">
+                {l.logro.emoji}
+              </span>
+            ))}
+          </span>
+        )}
+      </div>
+      <span className="text-xs font-medium">
+        {desbloqueados.length}/{total}
+      </span>
+    </Link>
   )
 }

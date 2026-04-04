@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback, useRef } from 'react'
 import { useMaterias } from '@/lib/hooks/useMaterias'
 import { MATERIAS, HORAS_TOTALES_OBLIGATORIAS } from '@/lib/data/materias'
 import { MateriaEstado, Seminario, UserProfile, Ciclo, Estado } from '@/lib/types'
@@ -15,6 +15,10 @@ import { calcularPromedio } from '@/lib/logic/promedios'
 import { CountdownBanner } from '@/components/CountdownBanner'
 import Link from 'next/link'
 import { AlertTriangle, Search, X, BookOpen, Upload } from 'lucide-react'
+import { calcularLogros, logrosDesbloqueadosIds } from '@/lib/logic/logros'
+import { LogroToastContainer } from '@/components/gamification/LogroToast'
+import { ShareHito, HitoTipo } from '@/components/gamification/ShareCard'
+import { Logro } from '@/lib/types'
 
 interface DashboardClientProps {
   profile: UserProfile
@@ -57,6 +61,53 @@ export function DashboardClient({
 
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('todas')
+  const [toastLogros, setToastLogros] = useState<Logro[]>([])
+
+  // Snapshot of current unlocked logros for diffing
+  const prevLogrosRef = useRef<Set<string>>(
+    logrosDesbloqueadosIds(initialEstados, initialSeminarios)
+  )
+
+  // Wrapper to detect new logros on materia updates
+  const handleActualizarEstado = useCallback(
+    async (materiaId: string, nuevoEstado: Partial<MateriaEstado>) => {
+      await actualizarEstado(materiaId, nuevoEstado)
+    },
+    [actualizarEstado]
+  )
+
+  // Check for new logros whenever estados change
+  const logrosActuales = useMemo(
+    () => logrosDesbloqueadosIds(estados, seminarios),
+    [estados, seminarios]
+  )
+
+  // Detect newly unlocked logros
+  useMemo(() => {
+    const prev = prevLogrosRef.current
+    const nuevos: string[] = []
+    Array.from(logrosActuales).forEach((id) => {
+      if (!prev.has(id)) nuevos.push(id)
+    })
+    if (nuevos.length > 0) {
+      const todosLogros = calcularLogros(estados, seminarios)
+      const logrosNuevos = todosLogros
+        .filter((l) => nuevos.includes(l.logro.id))
+        .map((l) => l.logro)
+      setToastLogros((prev) => [...prev, ...logrosNuevos])
+    }
+    prevLogrosRef.current = logrosActuales
+  }, [logrosActuales, estados, seminarios])
+
+  const dismissToast = useCallback((id: string) => {
+    setToastLogros((prev) => prev.filter((l) => l.id !== id))
+  }, [])
+
+  const [shareHito, setShareHito] = useState<HitoTipo | null>(null)
+
+  const handleCompartirLogro = useCallback((logro: Logro) => {
+    setShareHito({ tipo: 'logro', logro })
+  }, [])
 
   // Datos para mobile stats
   const mobileStats = useMemo(() => {
@@ -295,7 +346,7 @@ export function DashboardClient({
                 ciclo={ciclo}
                 materias={materiasDelCiclo}
                 estados={estados}
-                onActualizarEstado={actualizarEstado}
+                onActualizarEstado={handleActualizarEstado}
               />
             )
           })}
@@ -342,6 +393,15 @@ export function DashboardClient({
           </section>
         </div>
       </main>
+      <LogroToastContainer logros={toastLogros} onDismiss={dismissToast} onCompartir={handleCompartirLogro} />
+      {shareHito && (
+        <ShareHito
+          hito={shareHito}
+          nombre={profile.nombre_completo ?? ''}
+          estados={estados}
+          onClose={() => setShareHito(null)}
+        />
+      )}
     </div>
   )
 }

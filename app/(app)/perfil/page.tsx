@@ -1,9 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { MateriaEstado } from '@/lib/types'
+import { MateriaEstado, Seminario } from '@/lib/types'
 import { GuaraniImport } from '@/components/guarani/GuaraniImport'
 import { VencimientoEditor } from '@/components/guarani/VencimientoEditor'
 import { NotificationPrefs } from '@/components/perfil/NotificationPrefs'
+import { PerfilGamification } from '@/components/gamification/PerfilGamification'
 import { MATERIAS } from '@/lib/data/materias'
 import { parseAlertRules } from '@/lib/notifications'
 
@@ -65,9 +66,47 @@ export default async function PerfilPage() {
     estado: estadosActuales[m.id],
   }))
 
+  // Fetch profile data
+  const { data: profileData } = await supabase
+    .from('profiles')
+    .select('nombre_completo')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  // Fetch seminarios
+  const { data: rawSeminarios } = await supabase
+    .from('seminarios')
+    .select('*')
+    .eq('user_id', user.id)
+
+  const seminarios: Seminario[] = (rawSeminarios ?? []).map((s: Record<string, unknown>) => ({
+    numero: s.numero as 1 | 2 | 3,
+    nombre: (s.nombre as string) ?? undefined,
+    area: s.area as Seminario['area'],
+    estado: (s.estado as Seminario['estado']) ?? 'sin_cursar',
+    anio_cursado: (s.anio_cursado as number) ?? undefined,
+    cuatrimestre: (s.cuatrimestre as 1 | 2) ?? undefined,
+    nota: s.nota != null ? Number(s.nota) : undefined,
+  }))
+
+  // Completar los 3 seminarios
+  for (const n of [1, 2, 3] as const) {
+    if (!seminarios.find((s) => s.numero === n)) {
+      seminarios.push({ numero: n, estado: 'sin_cursar' })
+    }
+  }
+
   return (
     <div className="mx-auto max-w-2xl p-4 md:p-6 space-y-10">
       <h1 className="text-2xl font-bold">Perfil</h1>
+
+      <section className="space-y-4">
+        <PerfilGamification
+          nombre={profileData?.nombre_completo ?? ''}
+          estados={estadosActuales}
+          seminarios={seminarios}
+        />
+      </section>
 
       <section className="space-y-4">
         <div>
