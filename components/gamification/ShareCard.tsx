@@ -141,7 +141,7 @@ export function ShareHito({ hito, nombre, estados, onClose }: ShareHitoProps) {
     // Wrap text if too long
     const maxWidth = W - 160
     const words = tituloHito.split(' ')
-    let lines: string[] = []
+    const lines: string[] = []
     let currentLine = ''
     for (const word of words) {
       const test = currentLine ? `${currentLine} ${word}` : word
