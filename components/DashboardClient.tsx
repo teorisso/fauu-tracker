@@ -16,7 +16,7 @@ import { CountdownBanner } from '@/components/CountdownBanner'
 import Link from 'next/link'
 import { AlertTriangle, Search, X, BookOpen, Upload } from 'lucide-react'
 import { calcularLogros, logrosDesbloqueadosIds } from '@/lib/logic/logros'
-import { LogroToastContainer } from '@/components/gamification/LogroToast'
+import { LogroToastContainer, MateriaToastContainer, MateriaAprobadaInfo } from '@/components/gamification/LogroToast'
 import { ShareHito, HitoTipo } from '@/components/gamification/ShareCard'
 import { Logro } from '@/lib/types'
 
@@ -62,6 +62,7 @@ export function DashboardClient({
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('todas')
   const [toastLogros, setToastLogros] = useState<Logro[]>([])
+  const [toastMaterias, setToastMaterias] = useState<MateriaAprobadaInfo[]>([])
 
   // Snapshot of current unlocked logros for diffing
   const prevLogrosRef = useRef<Set<string>>(
@@ -72,6 +73,22 @@ export function DashboardClient({
   const handleActualizarEstado = useCallback(
     async (materiaId: string, nuevoEstado: Partial<MateriaEstado>) => {
       await actualizarEstado(materiaId, nuevoEstado)
+
+      // Detectar aprobación o promoción para mostrar toast con share
+      if (nuevoEstado.estado === 'final_aprobado' || nuevoEstado.estado === 'promocionada') {
+        const materia = MATERIAS.find((m) => m.id === materiaId)
+        if (materia) {
+          setToastMaterias((prev) => [
+            ...prev,
+            {
+              id: materiaId,
+              nombre: materia.nombre,
+              nota: nuevoEstado.nota,
+              esPromocion: nuevoEstado.estado === 'promocionada',
+            },
+          ])
+        }
+      }
     },
     [actualizarEstado]
   )
@@ -103,11 +120,40 @@ export function DashboardClient({
     setToastLogros((prev) => prev.filter((l) => l.id !== id))
   }, [])
 
+  const dismissMateriaToast = useCallback((id: string) => {
+    setToastMaterias((prev) => prev.filter((m) => m.id !== id))
+  }, [])
+
   const [shareHito, setShareHito] = useState<HitoTipo | null>(null)
 
   const handleCompartirLogro = useCallback((logro: Logro) => {
     setShareHito({ tipo: 'logro', logro })
   }, [])
+
+  const handleCompartirMateria = useCallback((materia: MateriaAprobadaInfo) => {
+    setShareHito({
+      tipo: 'materia',
+      materiaId: materia.id,
+      nombre: materia.nombre,
+      nota: materia.nota,
+    })
+  }, [])
+
+  // Compartir desde card (acceso persistente, independiente del toast)
+  const handleCompartirMateriaCard = useCallback(
+    (materiaId: string, nombre: string, nota?: number) => {
+      setShareHito({ tipo: 'materia', materiaId, nombre, nota })
+    },
+    []
+  )
+
+  // Compartir optativa aprobada
+  const handleCompartirSeminario = useCallback(
+    (nombre: string, nota?: number) => {
+      setShareHito({ tipo: 'materia', materiaId: '', nombre, nota })
+    },
+    []
+  )
 
   // Datos para mobile stats
   const mobileStats = useMemo(() => {
@@ -347,6 +393,7 @@ export function DashboardClient({
                 materias={materiasDelCiclo}
                 estados={estados}
                 onActualizarEstado={handleActualizarEstado}
+                onCompartir={handleCompartirMateriaCard}
               />
             )
           })}
@@ -387,6 +434,7 @@ export function DashboardClient({
                   key={sem.numero}
                   seminario={sem}
                   onUpdate={(datos) => actualizarSeminario(sem.numero, datos)}
+                  onCompartir={handleCompartirSeminario}
                 />
               ))}
             </div>
@@ -394,6 +442,7 @@ export function DashboardClient({
         </div>
       </main>
       <LogroToastContainer logros={toastLogros} onDismiss={dismissToast} onCompartir={handleCompartirLogro} />
+      <MateriaToastContainer materias={toastMaterias} onDismiss={dismissMateriaToast} onCompartir={handleCompartirMateria} />
       {shareHito && (
         <ShareHito
           hito={shareHito}

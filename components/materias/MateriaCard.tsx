@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { EstadoMenu } from './EstadoMenu'
 import { NotaModal } from './NotaModal'
 import { CorrelativaWarning } from './CorrelativaWarning'
+import { Share2 } from 'lucide-react'
 
 const ESTADOS_CON_DATOS: Estado[] = ['regular_vigente', 'promocionada', 'final_aprobado']
 
@@ -18,6 +19,7 @@ interface MateriaCardProps {
   estado: MateriaEstado | undefined
   allEstados: Record<string, MateriaEstado>
   onActualizarEstado: (materiaId: string, data: Partial<MateriaEstado>) => Promise<void>
+  onCompartir?: (materiaId: string, nombre: string, nota?: number) => void
 }
 
 export function MateriaCard({
@@ -25,6 +27,7 @@ export function MateriaCard({
   estado,
   allEstados,
   onActualizarEstado,
+  onCompartir,
 }: MateriaCardProps) {
   const estadoActual = estado?.estado ?? 'sin_cursar'
   const colors = ESTADO_COLORS[estadoActual]
@@ -152,6 +155,21 @@ export function MateriaCard({
                 {estado.anio_cursado}
                 {estado.cuatrimestre ? ` · ${estado.cuatrimestre}°C` : ''}
               </span>
+            )}
+            {/* Botón compartir — visible en aprobadas/promocionadas */}
+            {onCompartir && (estadoActual === 'final_aprobado' || estadoActual === 'promocionada') && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onCompartir(materia.id, materia.nombre, estado?.nota)
+                }}
+                className="rounded-md p-1 opacity-40 transition-all hover:opacity-100"
+                style={{ color: colors.fg }}
+                title="Compartir en stories"
+                aria-label="Compartir materia"
+              >
+                <Share2 className="h-3.5 w-3.5" />
+              </button>
             )}
           </div>
           {/* Vencimiento inline (fallback para touch, siempre visible cuando es urgente) */}

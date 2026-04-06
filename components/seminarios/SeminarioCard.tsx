@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { EstadoMenu } from '@/components/materias/EstadoMenu'
 import { NotaModal } from '@/components/materias/NotaModal'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Share2 } from 'lucide-react'
 
 const AREA_LABELS: Record<AreaSeminario, string> = {
   tecnologia_produccion_gestion: 'Tecnología, Producción y Gestión',
@@ -22,9 +22,10 @@ const ESTADOS_CON_DATOS: Estado[] = ['regular_vigente', 'promocionada', 'final_a
 interface SeminarioCardProps {
   seminario: Seminario
   onUpdate?: (datos: Partial<Seminario>) => void
+  onCompartir?: (nombre: string, nota?: number) => void
 }
 
-export function SeminarioCard({ seminario, onUpdate }: SeminarioCardProps) {
+export function SeminarioCard({ seminario, onUpdate, onCompartir }: SeminarioCardProps) {
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(seminario.nombre ?? '')
   const [showNotaModal, setShowNotaModal] = useState(false)
@@ -148,6 +149,18 @@ export function SeminarioCard({ seminario, onUpdate }: SeminarioCardProps) {
               {seminario.anio_cursado}
               {seminario.cuatrimestre ? ` · ${seminario.cuatrimestre}°C` : ''}
             </span>
+          )}
+          {/* Botón compartir — visible cuando está aprobada */}
+          {onCompartir && (seminario.estado === 'final_aprobado' || seminario.estado === 'promocionada') && (
+            <button
+              onClick={() => onCompartir(displayName, seminario.nota)}
+              className="rounded-md p-1 opacity-40 transition-all hover:opacity-100"
+              style={{ color: colors.fg }}
+              title="Compartir en stories"
+              aria-label="Compartir optativa"
+            >
+              <Share2 className="h-3.5 w-3.5" />
+            </button>
           )}
         </div>
       </div>

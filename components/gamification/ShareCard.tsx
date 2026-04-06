@@ -3,7 +3,7 @@
 import { useCallback, useState, useEffect, useRef } from 'react'
 import { MateriaEstado, Logro } from '@/lib/types'
 import { MATERIAS, HORAS_TOTALES_OBLIGATORIAS } from '@/lib/data/materias'
-import { Download, Check, X, Eye, Share2 } from 'lucide-react'
+import { Download, Check, X, Share2 } from 'lucide-react'
 
 export type HitoTipo =
   | { tipo: 'materia'; materiaId: string; nombre: string; nota?: number }
@@ -15,6 +15,8 @@ interface ShareHitoProps {
   estados: Record<string, MateriaEstado>
   onClose: () => void
 }
+
+// ---------- helpers de canvas ----------
 
 function drawRoundRect(
   ctx: CanvasRenderingContext2D,
@@ -37,21 +39,343 @@ function drawRoundRect(
   ctx.closePath()
 }
 
-// Colores de la paleta existente
-const COLORS = {
-  bgDark: '#1e3a5f',        // azul oscuro de la paleta
-  bgMedium: '#264b73',
-  accent: '#2d6a4f',         // verde aprobadas
-  accentLight: '#d4edda',
-  textWhite: '#f8f9fa',
-  textMuted: '#a0b4c8',
-  border: '#3a5f85',
-  yellow: '#f5c842',
+/**
+ * Wrap text dentro de un ancho máximo. Devuelve las líneas resultantes.
+ */
+function wrapText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number
+): string[] {
+  const words = text.split(' ')
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    const test = current ? `${current} ${word}` : word
+    if (ctx.measureText(test).width > maxWidth) {
+      if (current) lines.push(current)
+      current = word
+    } else {
+      current = test
+    }
+  }
+  if (current) lines.push(current)
+  return lines
 }
 
+// ---------- paleta ----------
+
+const C = {
+  bgTop:      '#152d4e',   // azul muy oscuro (top del gradiente)
+  bgBottom:   '#1e3a5f',   // azul oscuro paleta (bottom del gradiente)
+  accent:     '#2d6a4f',   // verde aprobadas
+  accentGlow: 'rgba(45,106,79,0.25)',
+  yellow:     '#f5c842',
+  yellowGlow: 'rgba(245,200,66,0.20)',
+  textWhite:  '#f0f4f8',
+  textMuted:  '#8baabb',
+  border:     'rgba(255,255,255,0.10)',
+  glassPanel: 'rgba(255,255,255,0.05)',
+  glassBorder:'rgba(255,255,255,0.12)',
+}
+
+// ---------- generador de canvas 1080×1920 ----------
+
+function buildCanvas(
+  tituloHito: string,
+  subtituloHito: string,
+  emojiHito: string,
+  esLogro: boolean,
+  nombre: string,
+  aprobadas: number,
+  totalMaterias: number,
+  horas: number,
+  pct: number,
+  estados: Record<string, MateriaEstado>
+): HTMLCanvasElement | null {
+  const W = 1080
+  const H = 1920
+  const canvas = document.createElement('canvas')
+  canvas.width  = W
+  canvas.height = H
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+
+  // ── Fondo degradado vertical ────────────────────────────────────────────────
+  const grad = ctx.createLinearGradient(0, 0, 0, H)
+  grad.addColorStop(0,   C.bgTop)
+  grad.addColorStop(0.6, C.bgBottom)
+  grad.addColorStop(1,   '#172840')
+  ctx.fillStyle = grad
+  ctx.fillRect(0, 0, W, H)
+
+  // Patrón de puntos sutil (solo en las esquinas)
+  ctx.fillStyle = 'rgba(255,255,255,0.025)'
+  for (let i = 0; i < W; i += 40) {
+    for (let j = 0; j < H; j += 40) {
+      ctx.beginPath()
+      ctx.arc(i, j, 1.2, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+
+  // ── Banda superior (acento) ──────────────────────────────────────────────────
+  const accentColor = esLogro ? C.yellow : C.accent
+  ctx.fillStyle = accentColor
+  ctx.fillRect(0, 0, W, 6)
+
+  // ── HEADER (y: 6 → 320) ─────────────────────────────────────────────────────
+  // Logo / branding
+  ctx.fillStyle = 'rgba(255,255,255,0.15)'
+  ctx.font = '700 28px Inter, system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+
+  // "FAUU TRACKER" badge
+  const badgeW = 280, badgeH = 52, badgeX = (W - badgeW) / 2, badgeY = 55
+  drawRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, 26)
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'
+  ctx.fill()
+  ctx.strokeStyle = C.glassBorder
+  ctx.lineWidth = 1
+  ctx.stroke()
+
+  ctx.fillStyle = C.textWhite
+  ctx.font = '600 22px Inter, system-ui, sans-serif'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('FAUU Tracker · Plan 2018', W / 2, badgeY + badgeH / 2)
+
+  // Nombre del estudiante
+  ctx.fillStyle = C.textMuted
+  ctx.font = '400 28px Inter, system-ui, sans-serif'
+  ctx.fillText(nombre || 'Estudiante', W / 2, 150)
+
+  // Separador
+  ctx.strokeStyle = C.border
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(120, 210)
+  ctx.lineTo(W - 120, 210)
+  ctx.stroke()
+
+  // ── HERO ZONE (y: 250 → 1000) ──────────────────────────────────────────────
+  const heroY = 500 // centro del emoji
+
+  // Glow radial detrás del emoji
+  const glowColor = esLogro ? C.yellowGlow : C.accentGlow
+  const glow = ctx.createRadialGradient(W / 2, heroY, 0, W / 2, heroY, 320)
+  glow.addColorStop(0, glowColor)
+  glow.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = glow
+  ctx.fillRect(0, heroY - 320, W, 640)
+
+  // Emoji grande
+  ctx.font = '160px Inter, system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillStyle = C.textWhite
+  ctx.fillText(emojiHito, W / 2, heroY)
+
+  // Badge de tipo (solo para logros) — debajo del emoji con margen amplio
+  if (esLogro) {
+    const lbW = 280, lbH = 48, lbX = (W - lbW) / 2, lbY = heroY + 110
+    drawRoundRect(ctx, lbX, lbY, lbW, lbH, 24)
+    ctx.fillStyle = C.yellow
+    ctx.fill()
+    ctx.fillStyle = '#1a1a1a'
+    ctx.font = '700 19px Inter, system-ui, sans-serif'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('LOGRO DESBLOQUEADO', W / 2, lbY + lbH / 2)
+  }
+
+  // Título del hito (wrapping)
+  // Para logros: badge bottom = heroY+110+48 = heroY+158
+  // titY baseline en heroY+300 → top de ascendentes ~heroY+230 > heroY+158 ✔
+  const titY = esLogro ? heroY + 300 : heroY + 200
+  ctx.fillStyle = C.textWhite
+  const fontSize = tituloHito.length > 22 ? 62 : 68
+  ctx.font = `700 ${fontSize}px Inter, system-ui, sans-serif`
+  ctx.textBaseline = 'alphabetic'
+  ctx.textAlign = 'center'
+  const lines = wrapText(ctx, tituloHito, W - 140)
+  const lineH = fontSize + 16
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], W / 2, titY + i * lineH)
+  }
+
+  // Subtítulo / nota
+  const subY = titY + lines.length * lineH + 28
+  ctx.fillStyle = esLogro ? C.yellow : C.textMuted
+  ctx.font = `${esLogro ? '500' : '400'} 32px Inter, system-ui, sans-serif`
+  ctx.fillText(subtituloHito, W / 2, subY)
+
+  // ── STATS ZONE (y: ~1050 → 1700) ────────────────────────────────────────────
+  const statsTop = 1070
+
+  // Panel glassmorphism
+  const panelX = 70, panelW = W - 140
+  const panelH = 560
+  drawRoundRect(ctx, panelX, statsTop, panelW, panelH, 28)
+  ctx.fillStyle = C.glassPanel
+  ctx.fill()
+  ctx.strokeStyle = C.glassBorder
+  ctx.lineWidth = 1
+  ctx.stroke()
+
+  // Línea de acento izquierda del panel
+  ctx.fillStyle = accentColor
+  ctx.beginPath()
+  ctx.moveTo(panelX + 28, statsTop)
+  ctx.arcTo(panelX + 14, statsTop, panelX, statsTop + 14, 14)
+  ctx.lineTo(panelX, statsTop + 14)
+  ctx.closePath()
+  // solo dibujar la línea de acento lateral
+  ctx.fillStyle = accentColor
+  ctx.fillRect(panelX, statsTop + 4, 4, panelH - 32)
+
+  // Título del bloque
+  ctx.fillStyle = C.textMuted
+  ctx.font = '600 20px Inter, system-ui, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
+  ctx.fillText('MI PROGRESO', panelX + 44, statsTop + 52)
+
+  // Números grandes en fila
+  const statRowY = statsTop + 130
+  const colW = panelW / 3
+  const statLbls = [
+    { val: `${aprobadas}/${totalMaterias}`, lbl: 'materias' },
+    { val: `${horas}`, lbl: `de ${HORAS_TOTALES_OBLIGATORIAS} hs` },
+    { val: `${pct}%`, lbl: 'completado' },
+  ]
+  statLbls.forEach((s, i) => {
+    const cx = panelX + colW * i + colW / 2
+    ctx.fillStyle = C.textWhite
+    ctx.font = `700 ${s.val.length > 5 ? '50' : '60'}px Inter, system-ui, sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'alphabetic'
+    ctx.fillText(s.val, cx, statRowY)
+    ctx.fillStyle = C.textMuted
+    ctx.font = '400 22px Inter, system-ui, sans-serif'
+    ctx.fillText(s.lbl, cx, statRowY + 36)
+  })
+
+  // Divisores entre columnas
+  ctx.strokeStyle = C.border
+  ctx.lineWidth = 1
+  for (let i = 1; i < 3; i++) {
+    const lx = panelX + colW * i
+    ctx.beginPath()
+    ctx.moveTo(lx, statsTop + 80)
+    ctx.lineTo(lx, statsTop + 200)
+    ctx.stroke()
+  }
+
+  // Barra de progreso general
+  const barY = statsTop + 240
+  const barX = panelX + 40
+  const barW = panelW - 80
+  const barH = 20
+  drawRoundRect(ctx, barX, barY, barW, barH, 10)
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'
+  ctx.fill()
+  const filledW = Math.max((pct / 100) * barW, 0)
+  if (filledW > 0) {
+    const barGrad = ctx.createLinearGradient(barX, 0, barX + filledW, 0)
+    barGrad.addColorStop(0, accentColor + 'cc')
+    barGrad.addColorStop(1, accentColor)
+    drawRoundRect(ctx, barX, barY, filledW, barH, 10)
+    ctx.fillStyle = barGrad
+    ctx.fill()
+  }
+  ctx.fillStyle = C.textMuted
+  ctx.font = '400 20px Inter, system-ui, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
+  ctx.fillText('Progreso de carrera', barX, barY + barH + 28)
+  ctx.textAlign = 'right'
+  ctx.fillStyle = accentColor
+  ctx.font = '600 20px Inter, system-ui, sans-serif'
+  ctx.fillText(`${pct}%`, barX + barW, barY + barH + 28)
+
+  // Barras por año (1°–6°)
+  const yearZoneY = statsTop + 340
+  const yearBarH = 14
+  const yearCols = 3
+  const yearColW = (panelW - 80) / yearCols
+  const yearRowH = 90
+
+  ctx.font = '500 20px Inter, system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'alphabetic'
+
+  for (let anio = 1; anio <= 6; anio++) {
+    const col = (anio - 1) % yearCols
+    const row = Math.floor((anio - 1) / yearCols)
+    const yx = panelX + 40 + col * yearColW
+    const yy = yearZoneY + row * yearRowH
+    const yw = yearColW - 24
+
+    const materiasAnio = MATERIAS.filter((m) => m.anio === anio)
+    const aprobadasAnio = materiasAnio.filter((m) => {
+      const e = estados[m.id]
+      return e && (e.estado === 'final_aprobado' || e.estado === 'promocionada')
+    }).length
+    const pctAnio = materiasAnio.length > 0 ? aprobadasAnio / materiasAnio.length : 0
+
+    // Label año
+    ctx.fillStyle = C.textMuted
+    ctx.fillText(`${anio}°`, yx + yw / 2, yy)
+
+    // Barra fondo
+    drawRoundRect(ctx, yx, yy + 8, yw, yearBarH, 7)
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'
+    ctx.fill()
+
+    // Barra fill
+    if (pctAnio > 0) {
+      const fillW = pctAnio * yw
+      drawRoundRect(ctx, yx, yy + 8, fillW, yearBarH, 7)
+      ctx.fillStyle = pctAnio === 1 ? accentColor : accentColor + '88'
+      ctx.fill()
+    }
+
+    // Porcentaje
+    ctx.fillStyle = pctAnio === 1 ? accentColor : C.textMuted
+    ctx.font = `${pctAnio === 1 ? '600' : '400'} 18px Inter, system-ui, sans-serif`
+    ctx.textAlign = 'right'
+    ctx.fillText(`${Math.round(pctAnio * 100)}%`, yx + yw, yy + barH + 38)
+    ctx.textAlign = 'center'
+    ctx.font = '500 20px Inter, system-ui, sans-serif'
+  }
+
+  // ── FOOTER (y: 1750 → 1920) ──────────────────────────────────────────────────
+  ctx.fillStyle = C.textMuted
+  ctx.font = '400 24px Inter, system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('fauu-tracker.vercel.app', W / 2, 1830)
+
+  // Motivo decorativo (puntos en línea)
+  ctx.fillStyle = 'rgba(255,255,255,0.12)'
+  for (let i = 0; i < 5; i++) {
+    ctx.beginPath()
+    ctx.arc(W / 2 - 40 + i * 20, 1875, 3, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  // Banda inferior
+  ctx.fillStyle = accentColor
+  ctx.fillRect(0, H - 6, W, 6)
+
+  return canvas
+}
+
+// ---------- componente principal ----------
+
 export function ShareHito({ hito, nombre, estados, onClose }: ShareHitoProps) {
-  const [saving, setSaving] = useState(false)
-  const [done, setDone] = useState(false)
+  const [saving, setSaving]             = useState(false)
+  const [done, setDone]                 = useState(false)
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null)
   const [showFullPreview, setShowFullPreview] = useState(false)
   const blobRef = useRef<Blob | null>(null)
@@ -68,237 +392,55 @@ export function ShareHito({ hito, nombre, estados, onClose }: ShareHitoProps) {
       : acc
   }, 0)
 
-  const tituloHito = hito.tipo === 'materia'
-    ? `¡Aprobé ${hito.nombre}!`
-    : `¡Desbloqueé: ${hito.logro.nombre}!`
-
-  const emojiHito = hito.tipo === 'materia' ? '✅' : hito.logro.emoji
-
-  const subtituloHito = hito.tipo === 'materia'
-    ? (hito.nota ? `Nota: ${hito.nota}` : 'Materia aprobada')
-    : hito.logro.descripcion
+  const esLogro     = hito.tipo === 'logro'
+  const emojiHito   = esLogro ? hito.logro.emoji : '✅'
+  const tituloHito  = esLogro ? `¡${hito.logro.nombre}!` : `¡Aprobé ${hito.nombre}!`
+  const subtituloHito = esLogro
+    ? hito.logro.descripcion
+    : (hito.nota ? `Nota final: ${hito.nota} 🎉` : 'Materia aprobada')
 
   const generateImage = useCallback((): HTMLCanvasElement | null => {
-    const W = 1080
-    const H = 1080
-    const canvas = document.createElement('canvas')
-    canvas.width = W
-    canvas.height = H
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return null
+    return buildCanvas(
+      tituloHito, subtituloHito, emojiHito, esLogro,
+      nombre, aprobadas, totalMaterias, horas, pct, estados
+    )
+  }, [tituloHito, subtituloHito, emojiHito, esLogro, nombre, aprobadas, totalMaterias, horas, pct, estados])
 
-    // Fondo sólido — azul oscuro de la paleta
-    ctx.fillStyle = COLORS.bgDark
-    ctx.fillRect(0, 0, W, H)
-
-    // Patrón de puntos sutil
-    ctx.fillStyle = 'rgba(255,255,255,0.03)'
-    for (let i = 0; i < W; i += 30) {
-      for (let j = 0; j < H; j += 30) {
-        ctx.beginPath()
-        ctx.arc(i, j, 1, 0, Math.PI * 2)
-        ctx.fill()
-      }
-    }
-
-    // Línea superior — verde de la paleta
-    ctx.fillStyle = COLORS.accent
-    ctx.fillRect(0, 0, W, 5)
-
-    // Subtítulo app
-    ctx.fillStyle = COLORS.textMuted
-    ctx.font = '20px Inter, system-ui, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.fillText('FAUU Tracker · Arquitectura Plan 2018', W / 2, 60)
-
-    // Nombre del estudiante
-    ctx.fillStyle = COLORS.textWhite
-    ctx.font = '28px Inter, system-ui, sans-serif'
-    ctx.fillText(nombre || 'Estudiante', W / 2, 100)
-
-    // Separador
-    ctx.strokeStyle = COLORS.border
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.moveTo(200, 130)
-    ctx.lineTo(W - 200, 130)
-    ctx.stroke()
-
-    // === HITO PRINCIPAL ===
-
-    // Emoji grande
-    ctx.font = '120px Inter, system-ui, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(emojiHito, W / 2, 280)
-    ctx.textBaseline = 'alphabetic'
-
-    // Título del hito
-    ctx.fillStyle = COLORS.textWhite
-    ctx.font = 'bold 52px Inter, system-ui, sans-serif'
-    ctx.textAlign = 'center'
-
-    // Wrap text if too long
-    const maxWidth = W - 160
-    const words = tituloHito.split(' ')
-    const lines: string[] = []
-    let currentLine = ''
-    for (const word of words) {
-      const test = currentLine ? `${currentLine} ${word}` : word
-      if (ctx.measureText(test).width > maxWidth) {
-        lines.push(currentLine)
-        currentLine = word
-      } else {
-        currentLine = test
-      }
-    }
-    lines.push(currentLine)
-
-    const lineHeight = 62
-    const startY = 400
-    for (let i = 0; i < lines.length; i++) {
-      ctx.fillText(lines[i], W / 2, startY + i * lineHeight)
-    }
-
-    // Subtítulo del hito
-    const subY = startY + lines.length * lineHeight + 20
-    ctx.fillStyle = COLORS.textMuted
-    ctx.font = '26px Inter, system-ui, sans-serif'
-    ctx.fillText(subtituloHito, W / 2, subY)
-
-    // === STATS COMPACTOS ===
-    const statsY = 650
-    const statsData = [
-      `${aprobadas}/${totalMaterias} materias`,
-      `${horas}/${HORAS_TOTALES_OBLIGATORIAS} horas`,
-      `${pct}% completado`,
-    ]
-
-    // Stats box
-    const boxW = W - 200
-    const boxH = 80
-    const boxX = 100
-    drawRoundRect(ctx, boxX, statsY, boxW, boxH, 12)
-    ctx.fillStyle = 'rgba(255,255,255,0.06)'
-    ctx.fill()
-    ctx.strokeStyle = COLORS.border
-    ctx.lineWidth = 1
-    ctx.stroke()
-
-    ctx.fillStyle = COLORS.textMuted
-    ctx.font = '22px Inter, system-ui, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.fillText(statsData.join('  ·  '), W / 2, statsY + 47)
-
-    // Barra de progreso
-    const barY = statsY + boxH + 30
-    const barX = 100
-    const barW = W - 200
-    const barH = 10
-
-    drawRoundRect(ctx, barX, barY, barW, barH, 5)
-    ctx.fillStyle = 'rgba(255,255,255,0.08)'
-    ctx.fill()
-
-    const filledW = (pct / 100) * barW
-    if (filledW > 0) {
-      drawRoundRect(ctx, barX, barY, filledW, barH, 5)
-      ctx.fillStyle = COLORS.accent
-      ctx.fill()
-    }
-
-    ctx.fillStyle = COLORS.textMuted
-    ctx.font = '16px Inter, system-ui, sans-serif'
-    ctx.textAlign = 'left'
-    ctx.fillText('Progreso de carrera', barX, barY + 30)
-    ctx.textAlign = 'right'
-    ctx.fillText(`${pct}%`, barX + barW, barY + 30)
-
-    // Barra por año
-    const yearBarY = barY + 60
-    ctx.font = '16px Inter, system-ui, sans-serif'
-    ctx.textAlign = 'center'
-
-    for (let anio = 1; anio <= 6; anio++) {
-      const materiasAnio = MATERIAS.filter((m) => m.anio === anio)
-      const aprobadasAnio = materiasAnio.filter((m) => {
-        const e = estados[m.id]
-        return e && (e.estado === 'final_aprobado' || e.estado === 'promocionada')
-      }).length
-      const segW = barW / 6
-      const segX = barX + (anio - 1) * segW
-
-      ctx.fillStyle = COLORS.textMuted
-      ctx.fillText(`${anio}°`, segX + segW / 2, yearBarY - 6)
-
-      drawRoundRect(ctx, segX + 3, yearBarY, segW - 6, 8, 3)
-      ctx.fillStyle = 'rgba(255,255,255,0.08)'
-      ctx.fill()
-
-      if (aprobadasAnio > 0) {
-        const filled = (aprobadasAnio / materiasAnio.length) * (segW - 6)
-        drawRoundRect(ctx, segX + 3, yearBarY, filled, 8, 3)
-        ctx.fillStyle = aprobadasAnio === materiasAnio.length ? COLORS.accent : COLORS.bgMedium
-        ctx.fill()
-      }
-    }
-
-    // Footer
-    ctx.fillStyle = COLORS.textMuted
-    ctx.font = '18px Inter, system-ui, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.fillText('fauu-tracker.vercel.app', W / 2, H - 40)
-
-    // Línea inferior
-    ctx.fillStyle = COLORS.accent
-    ctx.fillRect(0, H - 5, W, 5)
-
-    return canvas
-  }, [nombre, emojiHito, tituloHito, subtituloHito, aprobadas, totalMaterias, horas, pct, estados])
-
-  // Generar imagen al montar el componente
   useEffect(() => {
     const canvas = generateImage()
     if (!canvas) return
-
-    // Guardar data URL para preview
     setImageDataUrl(canvas.toDataURL('image/png'))
-
-    // Guardar blob para descarga
-    canvas.toBlob((b) => {
-      blobRef.current = b
-    }, 'image/png')
+    canvas.toBlob((b) => { blobRef.current = b }, 'image/png')
   }, [generateImage])
 
-  // Guardar imagen localmente
+  const getBlob = useCallback(async (): Promise<Blob | null> => {
+    if (blobRef.current) return blobRef.current
+    const canvas = generateImage()
+    if (!canvas) return null
+    return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+  }, [generateImage])
+
+  const filename = esLogro
+    ? `fauu-tracker-logro.png`
+    : `fauu-tracker-${hito.nombre.toLowerCase().replace(/\s+/g, '-').slice(0, 30)}.png`
+
   const handleDownload = useCallback(async () => {
     setSaving(true)
     try {
-      const blob = blobRef.current
-      if (!blob) {
-        const canvas = generateImage()
-        if (!canvas) return
-        const newBlob = await new Promise<Blob | null>((resolve) =>
-          canvas.toBlob((b) => resolve(b), 'image/png')
-        )
-        if (!newBlob) return
-        blobRef.current = newBlob
-      }
+      const blob = await getBlob()
+      if (!blob) return
+      blobRef.current = blob
 
-      const fileBlob = blobRef.current!
-
-      // Usar File System Access API — abre diálogo nativo "Guardar como..."
       if ('showSaveFilePicker' in window) {
         try {
-          const handle = await (window as unknown as { showSaveFilePicker: (opts: Record<string, unknown>) => Promise<FileSystemFileHandle> }).showSaveFilePicker({
-            suggestedName: 'fauu-tracker-hito.png',
-            types: [{
-              description: 'Imagen PNG',
-              accept: { 'image/png': ['.png'] },
-            }],
+          const handle = await (window as unknown as {
+            showSaveFilePicker: (opts: Record<string, unknown>) => Promise<FileSystemFileHandle>
+          }).showSaveFilePicker({
+            suggestedName: filename,
+            types: [{ description: 'Imagen PNG', accept: { 'image/png': ['.png'] } }],
           })
           const writable = await handle.createWritable()
-          await writable.write(fileBlob)
+          await writable.write(blob)
           await writable.close()
           setDone(true)
           setTimeout(() => setDone(false), 3000)
@@ -308,129 +450,153 @@ export function ShareHito({ hito, nombre, estados, onClose }: ShareHitoProps) {
         }
       }
 
-      // Fallback: mostrar la imagen grande para guardar con clic derecho
-      setShowFullPreview(true)
+      // Fallback: descarga directa
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(url)
+      setDone(true)
+      setTimeout(() => setDone(false), 3000)
     } catch (err) {
       console.error('Error guardando imagen:', err)
     } finally {
       setSaving(false)
     }
-  }, [generateImage])
+  }, [getBlob, filename])
 
-  // Compartir nativo a redes sociales (WhatsApp, Instagram, Twitter, etc.)
   const handleShare = useCallback(async () => {
     setSaving(true)
     try {
-      const blob = blobRef.current
+      const blob = await getBlob()
       if (!blob) return
+      blobRef.current = blob
+      const file = new File([blob], filename, { type: 'image/png' })
 
-      const file = new File([blob], 'fauu-tracker-hito.png', { type: 'image/png' })
-
-      // Verificar soporte al momento de clickear
-      if (typeof navigator.share === 'function' &&
-          typeof navigator.canShare === 'function' &&
-          navigator.canShare({ files: [file] })) {
+      if (
+        typeof navigator.share === 'function' &&
+        typeof navigator.canShare === 'function' &&
+        navigator.canShare({ files: [file] })
+      ) {
         await navigator.share({
           title: tituloHito,
-          text: `${tituloHito} 🏗️ #FAUUTracker`,
+          text: `${tituloHito} 🏗️ #FAUUTracker #Arquitectura`,
           files: [file],
         })
         setDone(true)
         setTimeout(() => setDone(false), 3000)
       } else {
-        // Navegador no soporta compartir archivos — fallback a descarga
-        handleDownload()
+        await handleDownload()
       }
     } catch (err) {
-      if ((err as Error).name !== 'AbortError') {
-        console.error('Error compartiendo:', err)
-      }
+      if ((err as Error).name !== 'AbortError') console.error('Error compartiendo:', err)
     } finally {
       setSaving(false)
     }
-  }, [tituloHito, handleDownload])
+  }, [getBlob, filename, tituloHito, handleDownload])
 
-  // Vista de preview grande para clic derecho → Guardar imagen como...
+  // ── Vista full preview ──────────────────────────────────────────────────────
   if (showFullPreview && imageDataUrl) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 p-4">
-        <div className="relative w-full max-w-lg space-y-3">
-          <div className="rounded-lg border bg-background p-3 text-center space-y-1">
-            <p className="text-sm font-semibold">Clic derecho en la imagen → &quot;Guardar imagen como...&quot;</p>
-            <p className="text-xs text-muted-foreground">
-              Esto te permite elegir nombre y ubicación del archivo
-            </p>
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 p-4">
+        <div className="flex w-full max-w-sm flex-col gap-3">
+          <p className="text-center text-xs text-white/60">
+            Clic derecho → &quot;Guardar imagen como...&quot; o usá el botón de abajo
+          </p>
+          <div className="relative overflow-hidden rounded-2xl shadow-2xl" style={{ aspectRatio: '9/16' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageDataUrl}
+              alt={tituloHito}
+              className="h-full w-full object-contain"
+            />
           </div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={imageDataUrl}
-            alt={tituloHito}
-            className="w-full rounded-lg shadow-2xl"
-          />
-          <button
-            onClick={() => setShowFullPreview(false)}
-            className="w-full rounded-md border bg-background px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted"
-          >
-            ← Volver
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleDownload}
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-3 text-sm font-medium text-white backdrop-blur hover:bg-white/20 transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              Guardar
+            </button>
+            <button
+              onClick={() => setShowFullPreview(false)}
+              className="rounded-xl bg-white/10 px-4 py-3 text-sm text-white backdrop-blur hover:bg-white/20 transition-colors"
+            >
+              ← Volver
+            </button>
+          </div>
         </div>
       </div>
     )
   }
 
+  // ── Modal principal ─────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="relative w-full max-w-md rounded-lg border bg-background p-5 shadow-lg space-y-4">
-        {/* Close */}
-        <button
-          onClick={onClose}
-          className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground hover:bg-muted transition-colors"
-          aria-label="Cerrar"
-        >
-          <X className="h-4 w-4" />
-        </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="relative w-full max-w-sm rounded-2xl border bg-card shadow-2xl overflow-hidden">
+        {/* Borde superior con acento */}
+        <div
+          className="h-1 w-full"
+          style={{ background: esLogro ? '#f5c842' : '#2d6a4f' }}
+        />
 
-        <div className="space-y-1">
-          <h3 className="text-base font-semibold">Compartir hito</h3>
-          <p className="text-xs text-muted-foreground">
-            Descargá la imagen para compartir en redes sociales
-          </p>
-        </div>
-
-        {/* Preview de la imagen real generada */}
-        {imageDataUrl ? (
-          <div className="overflow-hidden rounded-lg border shadow-sm">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imageDataUrl}
-              alt={tituloHito}
-              className="w-full"
-            />
+        <div className="p-5 space-y-4">
+          {/* Header del modal */}
+          <div className="flex items-start justify-between">
+            <div className="space-y-0.5">
+              <h3 className="text-base font-semibold">
+                {esLogro ? '🏆 Compartir logro' : '✅ Compartir materia'}
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Imagen lista para compartir en stories de Instagram o WhatsApp
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted transition-colors"
+              aria-label="Cerrar"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
-        ) : (
-          <div className="rounded-lg border bg-[hsl(var(--estado-final-aprobado-bg))] p-4 text-[hsl(var(--estado-final-aprobado-fg))]">
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">{emojiHito}</span>
-              <div className="min-w-0">
-                <p className="font-semibold text-sm">{tituloHito}</p>
-                <p className="text-xs opacity-80">{subtituloHito}</p>
+
+          {/* Preview 9:16 */}
+          <div
+            className="w-full overflow-hidden rounded-xl border shadow-sm bg-[#1e3a5f] cursor-pointer"
+            style={{ aspectRatio: '9/16', maxHeight: '45vh' }}
+            onClick={() => setShowFullPreview(true)}
+            title="Clic para ver en grande"
+          >
+            {imageDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={imageDataUrl}
+                alt={tituloHito}
+                className="h-full w-full object-contain"
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
               </div>
-            </div>
-            <div className="mt-3 flex items-center justify-between text-xs opacity-70">
-              <span>{aprobadas}/{totalMaterias} materias · {pct}%</span>
-              <span>FAUU Tracker</span>
-            </div>
+            )}
           </div>
-        )}
 
-        {/* Actions */}
-        <div className="flex flex-col gap-2">
-          {/* Fila principal: Compartir + Guardar */}
-          <div className="flex gap-2">
+          <p className="text-center text-[10px] text-muted-foreground">
+            Tocá la imagen para verla completa
+          </p>
+
+          {/* Acciones */}
+          <div className="flex gap-2 pt-1">
             <button
               onClick={handleShare}
-              disabled={saving}
-              className="flex-1 inline-flex items-center justify-center gap-2 rounded-md border bg-[hsl(var(--estado-final-aprobado-bg))] px-4 py-2.5 text-sm font-medium text-[hsl(var(--estado-final-aprobado-fg))] transition-colors hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
+              disabled={saving || !imageDataUrl}
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all active:scale-[0.98] disabled:opacity-50"
+              style={{
+                background: esLogro ? '#f5c842' : '#2d6a4f',
+                color: esLogro ? '#1a1a1a' : '#ffffff',
+              }}
             >
               {saving ? (
                 <>
@@ -440,39 +606,27 @@ export function ShareHito({ hito, nombre, estados, onClose }: ShareHitoProps) {
               ) : done ? (
                 <>
                   <Check className="h-4 w-4" />
-                  ¡Listo!
+                  ¡Enviado!
                 </>
               ) : (
                 <>
                   <Share2 className="h-4 w-4" />
-                  Compartir
+                  Compartir en Stories
                 </>
               )}
             </button>
+
             <button
               onClick={handleDownload}
-              disabled={saving}
-              className="inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted active:scale-[0.98] disabled:opacity-60"
+              disabled={saving || !imageDataUrl}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border px-4 py-3 text-sm font-medium transition-colors hover:bg-muted active:scale-[0.98] disabled:opacity-50"
+              title="Guardar imagen"
             >
-              <Download className="h-4 w-4" />
-              Guardar
-            </button>
-          </div>
-          {/* Fila secundaria: Ver + Cerrar */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowFullPreview(true)}
-              disabled={!imageDataUrl}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
-            >
-              <Eye className="h-3.5 w-3.5" />
-              Ver imagen completa
-            </button>
-            <button
-              onClick={onClose}
-              className="rounded-md border px-4 py-2 text-xs transition-colors hover:bg-muted"
-            >
-              Cerrar
+              {done ? (
+                <Check className="h-4 w-4 text-green-600" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
             </button>
           </div>
         </div>

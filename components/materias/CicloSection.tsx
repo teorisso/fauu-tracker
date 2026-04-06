@@ -21,6 +21,7 @@ interface CicloSectionProps {
   materias: Materia[]
   estados: Record<string, MateriaEstado>
   onActualizarEstado: (materiaId: string, data: Partial<MateriaEstado>) => Promise<void>
+  onCompartir?: (materiaId: string, nombre: string, nota?: number) => void
 }
 
 export function CicloSection({
@@ -28,6 +29,7 @@ export function CicloSection({
   materias,
   estados,
   onActualizarEstado,
+  onCompartir,
 }: CicloSectionProps) {
   const anios = Array.from(new Set(materias.map((m) => m.anio))).sort()
 
@@ -49,6 +51,7 @@ export function CicloSection({
                   estado={estados[materia.id]}
                   allEstados={estados}
                   onActualizarEstado={onActualizarEstado}
+                  onCompartir={onCompartir}
                 />
               ))}
             </div>
