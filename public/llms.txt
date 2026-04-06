@@ -1,0 +1,41 @@
+# FAUU Tracker
+
+> Aplicación web de seguimiento de progreso académico para la carrera de Arquitectura (Plan 2018) de la FAU-UNNE. Los estudiantes registran el estado de sus materias, controlan correlatividades, gestionan mesas de examen y reciben alertas de vencimientos.
+
+## Documentación principal
+
+- [Especificación técnica completa](/SPEC.md): Schema de base de datos, datos estáticos del plan de estudios, reglas de correlatividades, funcionalidades y diseño visual.
+- [Guía de desarrollo y deploy](/README.md): Setup local, variables de entorno, deploy en Vercel, configuración de alertas y Web Push (VAPID).
+- [Instrucciones para agentes de código](/AGENTS.md): Convenciones de código, arquitectura del proyecto, base de datos, Edge Functions y paleta de diseño.
+
+## Stack tecnológico
+
+- Next.js 14 (App Router, TypeScript estricto)
+- Supabase (PostgreSQL + Auth + Edge Functions)
+- Tailwind CSS + shadcn/ui
+- Deploy en Vercel
+
+## Funcionalidades
+
+- Dashboard de materias con 6 estados posibles (sin cursar, cursando, regular vigente, regular vencida, promocionada, final aprobado)
+- Validación de correlatividades del Plan 2018 (advertencias, no bloqueos)
+- Importación de historial académico desde SIU Guaraní (.xls)
+- Calendario de mesas de examen con inscripción planificada
+- Alertas configurables por email y/o notificación del navegador para vencimientos de regularidad y mesas anotadas
+- 3 seminarios optativos configurables
+- Sistema de logros (gamificación)
+- Heatmap de actividad académica
+- Compartir hitos como imagen
+- Proyección de egreso basada en ritmo de avance
+- Tema claro/oscuro
+- Responsive (mobile y desktop)
+
+## Datos del plan de estudios
+
+- 33 materias obligatorias distribuidas en 6 años y 3 ciclos (introductorio, disciplinar, profesional)
+- 3592 horas cátedra obligatorias + 210 horas optativas
+- Correlatividades hardcodeadas en el código (no en la base de datos)
+
+## Información de contacto
+
+Desarrollado por Teo Risso — Estudiante y desarrollador · FAU-UNNE

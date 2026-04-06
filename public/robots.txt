@@ -1,0 +1,18 @@
+# https://www.robotstxt.org/robotstxt.html
+
+User-agent: *
+Allow: /
+
+# Rutas privadas (requieren auth, no tienen sentido para crawlers)
+Disallow: /perfil
+Disallow: /materias
+Disallow: /calendario
+
+# API endpoints
+Disallow: /api/
+
+# Next.js internals
+Disallow: /_next/
+
+# Sitemap (descomentar cuando exista)
+# Sitemap: https://fauu-tracker.vercel.app/sitemap.xml

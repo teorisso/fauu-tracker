@@ -8,11 +8,10 @@ su progreso se guarda en la nube y puede acceder desde cualquier dispositivo.
 ## Stack tecnológico
 - **Framework:** Next.js 14 con App Router
 - **Lenguaje:** TypeScript estricto en todo el proyecto
-- **Base de datos y auth:** Supabase (PostgreSQL + Supabase Auth)
+- **Base de datos y auth:** Supabase (PostgreSQL + Supabase Auth + Edge Functions)
 - **Estilos:** Tailwind CSS
 - **Componentes:** shadcn/ui como base
 - **Deploy:** Vercel
-- **Testing:** Vitest para lógica de negocio (correlatividades, promedios)
 
 ## Estructura de archivos
 ```
@@ -20,48 +19,104 @@ su progreso se guarda en la nube y puede acceder desde cualquier dispositivo.
 ├── app/
 │   ├── (auth)/
 │   │   ├── login/
-│   │   │   └── page.tsx
+│   │   │   └── page.tsx          → landing + login (Google OAuth, magic link)
 │   │   └── callback/
-│   │       └── route.ts
+│   │       └── route.ts          → callback de auth
 │   ├── (app)/
-│   │   ├── layout.tsx        → layout con sidebar de stats
-│   │   ├── page.tsx          → dashboard principal con las materias
+│   │   ├── layout.tsx            → layout con header y nav
+│   │   ├── materias/
+│   │   │   └── page.tsx          → dashboard principal con las materias
+│   │   ├── calendario/
+│   │   │   ├── page.tsx          → calendario de mesas de examen
+│   │   │   └── gestionar/        → gestión de mesas personalizadas
 │   │   └── perfil/
-│   │       └── page.tsx      → nombre, export/import, configuración
-│   └── layout.tsx
+│   │       └── page.tsx          → importación Guaraní, vencimientos, notificaciones, gamificación
+│   ├── api/
+│   │   ├── calendario-fau/       → scraping del calendario académico FAU
+│   │   ├── mesas-fau/            → scraping de mesas de examen FAU
+│   │   └── vapid-public/         → endpoint para clave pública VAPID (runtime)
+│   ├── page.tsx                  → landing page pública
+│   └── layout.tsx                → root layout con ThemeProvider
 ├── components/
 │   ├── materias/
-│   │   ├── MateriaCard.tsx
-│   │   ├── EstadoMenu.tsx    → menú contextual flotante
-│   │   ├── NotaModal.tsx     → modal para cargar nota y fecha
-│   │   └── CicloSection.tsx  → agrupa cards por año/ciclo
+│   │   ├── MateriaCard.tsx       → card de materia con estado visual
+│   │   ├── EstadoMenu.tsx        → menú contextual flotante de estados
+│   │   ├── NotaModal.tsx         → modal para cargar nota y fecha
+│   │   ├── CicloSection.tsx      → agrupa cards por año/ciclo
+│   │   ├── CorrelativaWarning.tsx → banner de advertencia de correlatividades
+│   │   └── Leyenda.tsx           → leyenda de colores por estado
 │   ├── stats/
-│   │   ├── StatsPanel.tsx
-│   │   ├── BarraProgreso.tsx
-│   │   └── ProyeccionEgreso.tsx
+│   │   ├── StatsPanel.tsx        → panel completo: progreso, horas, promedio, proyección, ciclos
+│   │   └── ProximosExamenes.tsx  → sugerencia de próximas mesas
 │   ├── seminarios/
-│   │   └── SeminarioCard.tsx → card editable para optativos
-│   └── easter-egg/
-│       ├── Confetti.tsx      → canvas animation
-│       └── CelebracionModal.tsx
+│   │   └── SeminarioCard.tsx     → card editable para optativos
+│   ├── gamification/
+│   │   ├── LogrosPanel.tsx       → panel de logros desbloqueados
+│   │   ├── LogroToast.tsx        → notificación al desbloquear logro
+│   │   ├── HeatmapActividad.tsx  → heatmap mensual de actividad
+│   │   ├── ShareCard.tsx         → generación de imagen para compartir hitos
+│   │   └── PerfilGamification.tsx → sección de gamificación en perfil
+│   ├── calendario/
+│   │   ├── CalendarioMesas.tsx    → vista del calendario de mesas
+│   │   ├── CalendarioPageClient.tsx
+│   │   ├── CalendarMonthGrid.tsx  → grilla mensual
+│   │   ├── CalendarTimeline.tsx   → vista timeline
+│   │   ├── CalendarViewToggle.tsx → toggle entre vistas
+│   │   └── GestionarCalendarioClient.tsx → gestión de mesas custom
+│   ├── guarani/
+│   │   ├── GuaraniImport.tsx     → importación desde SIU Guaraní (.xls)
+│   │   └── VencimientoEditor.tsx → editor de fechas de vencimiento
+│   ├── perfil/
+│   │   └── NotificationPrefs.tsx → configuración de alertas (email + push)
+│   ├── auth/
+│   │   └── LogoutButton.tsx
+│   ├── easter-egg/               → (pendiente de implementar)
+│   ├── ui/                       → primitivos shadcn/ui
+│   ├── DashboardClient.tsx       → cliente del dashboard de materias
+│   ├── CountdownBanner.tsx       → banner de cuenta regresiva
+│   ├── NavLinks.tsx              → links de navegación
+│   ├── ThemeProvider.tsx         → provider de tema claro/oscuro
+│   ├── ThemeToggle.tsx           → switch de tema
+│   └── AppFooter.tsx
 ├── lib/
 │   ├── supabase/
-│   │   ├── client.ts         → supabase browser client
-│   │   ├── server.ts         → supabase server client
-│   │   └── middleware.ts
+│   │   ├── client.ts             → supabase browser client
+│   │   ├── server.ts             → supabase server client
+│   │   └── middleware.ts         → refresh de sesión
 │   ├── data/
-│   │   ├── materias.ts       → datos estáticos del plan
-│   │   └── correlatividades.ts → reglas hardcodeadas del plan
+│   │   ├── materias.ts           → datos estáticos del plan (33 materias)
+│   │   ├── correlatividades.ts   → reglas hardcodeadas del plan
+│   │   ├── calendario-academico.ts → fechas del calendario académico
+│   │   ├── guaraniCodeMap.ts     → mapeo de códigos Guaraní → IDs internos
+│   │   └── mesa-name-map.ts     → mapeo de nombres de mesas del scraper
 │   ├── logic/
-│   │   ├── correlatividades.ts → funciones puras de validación
-│   │   ├── promedios.ts      → cálculo de promedios
-│   │   └── proyeccion.ts     → estimación de egreso
-│   └── types.ts              → tipos compartidos
+│   │   ├── correlatividades.ts   → funciones puras de validación
+│   │   ├── promedios.ts          → cálculo de promedios y horas
+│   │   ├── proyeccion.ts         → estimación de egreso
+│   │   ├── vencimientos.ts       → lógica de vencimientos de regularidad
+│   │   ├── logros.ts             → sistema de logros (gamificación)
+│   │   ├── guaraniParser.ts      → parser de archivos .xls de Guaraní
+│   │   ├── mesasScraper.ts       → scraper de mesas de examen FAU
+│   │   └── planificacion.ts      → lógica de planificación académica
+│   ├── hooks/
+│   │   └── useMaterias.ts        → hook para gestión de estados de materias
+│   ├── utils/
+│   │   └── ics-generator.ts      → generador de archivos .ics (calendario)
+│   ├── types.ts                  → tipos compartidos
+│   ├── estado-utils.ts           → utilidades de estados
+│   ├── notifications.ts          → utilidades de notificaciones
+│   ├── push-client.ts            → cliente Web Push (VAPID)
+│   └── utils.ts                  → utilidades generales (cn)
 ├── supabase/
-│   └── migrations/
-│       └── 001_initial.sql
-├── middleware.ts              → protección de rutas
-└── SPEC.md                   → este archivo
+│   ├── migrations/               → 001 a 009 (schema, notificaciones, mesas, push)
+│   └── functions/
+│       └── check-vencimientos/   → Edge Function: cron diario de alertas
+├── public/
+│   ├── sw.js                     → service worker para push notifications
+│   ├── robots.txt
+│   └── llms.txt
+├── middleware.ts                  → protección de rutas con Supabase Auth
+└── SPEC.md                       → este archivo
 ```
 
 ---
@@ -494,7 +549,7 @@ export const CORRELATIVIDADES: ReglaCorrelatividad[] = [
 
 ---
 
-## Funcionalidades a implementar
+## Funcionalidades
 
 ### Autenticación
 - Login con Google OAuth (Supabase lo maneja)
@@ -524,14 +579,17 @@ están en estado 'regularizada' o superior (regular_vigente,
 final_aprobado, promocionada).
 
 ### Panel de estadísticas
-Sidebar fijo en desktop, colapsable en mobile:
+Sidebar fijo en desktop, colapsable en mobile (todo integrado en `StatsPanel.tsx`):
 - Nombre del estudiante (editable inline)
 - Barra de progreso general
 - Materias aprobadas / total
 - Horas acreditadas / 3592hs
 - Promedio (solo materias con nota, sin aplazos)
 - Proyección de egreso (si hay suficientes datos temporales)
-- Estado por ciclo
+- Regularidades próximas a vencer
+- Próximos exámenes sugeridos
+- Estado por ciclo (introductorio, disciplinar, profesional + optativos)
+- Contador de logros desbloqueados
 
 ### Estadísticas: cálculo de proyección
 Solo mostrar si el usuario tiene al menos 4 materias con
@@ -545,7 +603,34 @@ Mostrar con honestidad: "Estimación aproximada basada en tu ritmo actual"
 - Si falla la sincronización, mostrar un toast de error y revertir
 - Indicador visual sutil cuando hay cambios pendientes de sync
 
-### Export / Import
+### Importación desde SIU Guaraní
+- Importar historial académico desde el archivo `.xls` de Historia Académica del SIU Guaraní
+- Parser automático de estados (aprobada, regular, etc.) con fechas exactas
+- Mapeo de códigos de materia Guaraní a IDs internos (`lib/data/guaraniCodeMap.ts`)
+- Tras importar, se pueden cargar fechas de vencimiento de regularidad
+
+### Calendario de mesas de examen
+- Calendario visual con turnos de examen del año en curso
+- Vistas: grilla mensual y timeline
+- Marcar mesas en las que te vas a inscribir
+- Exportar mesas anotadas como archivo `.ics`
+- Scraping automático de mesas desde la FAU
+- Gestión de mesas custom (agregar/editar/eliminar)
+
+### Alertas y notificaciones
+- Reglas de alerta configurables: anticipación en días o semanas
+- Canales: email y/o notificación push del navegador (Web Push / VAPID)
+- Edge Function `check-vencimientos` como cron diario en Supabase
+- Deduplicación de envíos con tabla `notification_deliveries`
+- Zona horaria: `America/Argentina/Cordoba`
+
+### Gamificación
+- Sistema de logros desbloqueables por progreso académico
+- Heatmap mensual de actividad
+- Compartir hitos como imagen (generación con Canvas API)
+- Toast de notificación al desbloquear un logro
+
+### Export / Import JSON *(pendiente de implementar)*
 - Export: descarga un JSON con todos los estados del usuario
 - Import: sube un JSON y pregunta si quiere reemplazar o mergear
 - El JSON debe ser legible (con nombres de materias, no solo IDs)
@@ -566,16 +651,22 @@ Mostrar con honestidad: "Estimación aproximada basada en tu ritmo actual"
   - promocionada → fondo verde claro, texto verde oscuro
   - final_aprobado → fondo verde oscuro, texto blanco
 - Mostrar nota en la card si está cargada (número grande y visible)
-- Leyenda de estados siempre visible en el sidebar
+- Leyenda de estados visible en desktop, colapsable en mobile
+- Tema claro/oscuro soportado vía `next-themes`
 
 ---
 
-## Easter Egg
+## Easter Egg *(pendiente de implementar)*
+
+> **Estado:** el directorio `components/easter-egg/` existe pero está vacío.
+> La tabla `profiles` ya tiene los campos `carrera_completada` y
+> `carrera_completada_at` listos para usar.
+
 Condición: cuando se registra la última materia obligatoria
 como 'final_aprobado' o 'promocionada', incluyendo TFC, PPA
 y Organización Legislación y Gestión Profesional.
 
-Flujo:
+Flujo planificado:
 1. Modal de confirmación antes de guardar el último estado
 2. Si confirma → guardar en DB → marcar profiles.carrera_completada = true
 3. Disparar celebración:
@@ -588,11 +679,18 @@ Flujo:
 ---
 
 ## Variables de entorno necesarias
+
+Ver `.env.local.example` para la lista completa. Las principales:
+
 ```
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=  (solo para server, nunca al cliente)
+NEXT_PUBLIC_SUPABASE_URL=        # URL del proyecto Supabase
+NEXT_PUBLIC_SUPABASE_ANON_KEY=   # Clave anónima pública
+NEXT_PUBLIC_APP_URL=             # URL pública de la app (para emails)
+VAPID_PUBLIC_KEY=                # Clave pública VAPID (runtime, vía /api/vapid-public)
 ```
+
+**Nota:** `SUPABASE_SERVICE_ROLE_KEY` solo se usa en la Edge Function
+`check-vencimientos` (como secret de Supabase), no en `.env.local`.
 
 ---
 
@@ -605,5 +703,4 @@ SUPABASE_SERVICE_ROLE_KEY=  (solo para server, nunca al cliente)
 - No inventar correlatividades que no estén en este documento
 - No calcular el promedio con aplazos (la lógica varía por reglamentación,
   solo mostrar promedio simple de notas aprobadas)
-```
 
