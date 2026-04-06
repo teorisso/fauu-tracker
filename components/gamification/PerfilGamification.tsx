@@ -34,7 +34,7 @@ export function PerfilGamification({
 
       {/* Heatmap completo */}
       <div className="space-y-2">
-        <h3 className="text-base font-semibold">📊 Actividad académica</h3>
+        <h3 className="text-base font-semibold">Actividad académica</h3>
         <p className="text-xs text-muted-foreground">
           Historial de aprobaciones y regularidades de los últimos 12 meses
         </p>

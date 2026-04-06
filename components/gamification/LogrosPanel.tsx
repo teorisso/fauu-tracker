@@ -60,11 +60,10 @@ export function LogrosPanel({ estados, seminarios, compacto = false, onCompartir
               <Tooltip key={l.logro.id}>
                 <TooltipTrigger asChild>
                   <span
-                    className={`inline-flex h-7 w-7 items-center justify-center rounded-md text-sm transition-all ${
-                      l.desbloqueado
+                    className={`inline-flex h-7 w-7 items-center justify-center rounded-md text-sm transition-all ${l.desbloqueado
                         ? 'bg-[hsl(var(--estado-final-aprobado-bg))] shadow-sm hover:scale-110 cursor-default'
                         : 'bg-muted opacity-40 grayscale cursor-default'
-                    }`}
+                      }`}
                   >
                     {l.logro.emoji}
                   </span>
@@ -85,7 +84,7 @@ export function LogrosPanel({ estados, seminarios, compacto = false, onCompartir
   return (
     <div className="space-y-5">
       <div className="flex items-baseline justify-between">
-        <h3 className="text-base font-semibold">🏅 Logros</h3>
+        <h3 className="text-base font-semibold">Logros</h3>
         <span className="text-sm text-muted-foreground">
           {desbloqueados} de {total} desbloqueados
         </span>
@@ -111,11 +110,10 @@ export function LogrosPanel({ estados, seminarios, compacto = false, onCompartir
               {items.map((l) => (
                 <div
                   key={l.logro.id}
-                  className={`group relative flex items-center gap-2.5 rounded-lg border p-2.5 transition-all ${
-                    l.desbloqueado
+                  className={`group relative flex items-center gap-2.5 rounded-lg border p-2.5 transition-all ${l.desbloqueado
                       ? 'border-[hsl(var(--estado-final-aprobado-bg))] bg-[hsl(var(--estado-promocionada-bg))]'
                       : 'border-border bg-muted/30 opacity-50 grayscale'
-                  }`}
+                    }`}
                 >
                   <span className="text-xl shrink-0">{l.logro.emoji}</span>
                   <div className="min-w-0 flex-1">
