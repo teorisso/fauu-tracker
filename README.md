@@ -10,6 +10,9 @@ Seguimiento de progreso académico para la carrera de Arquitectura Plan 2018 —
 - Recordatorios para **mesas en las que te anotaste** (próxima fecha por materia)
 - Calendario de mesas de examen 2026 con inscripción planificada
 - Seminarios optativos configurables
+- **Gamificación**: logros desbloqueables, heatmap de actividad, compartir hitos como imagen
+- **Términos y Condiciones** con consentimiento explícito al ingresar
+- **Eliminación de cuenta** con borrado completo en cascada
 - Tema claro/oscuro
 - Responsive (mobile y desktop)
 
@@ -53,6 +56,7 @@ npm run dev
 | `NEXT_PUBLIC_SUPABASE_URL` | URL del proyecto Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clave anónima pública de Supabase |
 | `NEXT_PUBLIC_APP_URL` | URL de producción (ej: `https://fauu-tracker.vercel.app`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (necesaria para `deleteAccount` y la Edge Function) |
 | `VAPID_PUBLIC_KEY` | Clave **pública** VAPID (recomendada; se sirve en runtime vía `/api/vapid-public`) |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Alternativa: misma clave pública (se inyecta al build; si falla el push, usá `VAPID_PUBLIC_KEY`) |
 

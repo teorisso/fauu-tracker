@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { signInWithGoogle, signInWithMagicLink } from './actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,11 +35,11 @@ function GoogleIcon({ className }: { className?: string }) {
   )
 }
 
-function GoogleSubmitButton() {
+function GoogleSubmitButton({ disabled }: { disabled?: boolean }) {
   const { pending } = useFormStatus()
 
   return (
-    <Button type="submit" className="w-full gap-2" disabled={pending}>
+    <Button type="submit" className="w-full gap-2" disabled={pending || disabled}>
       {pending ? (
         <Loader2 className="h-4 w-4 animate-spin" />
       ) : (
@@ -55,6 +56,7 @@ function LoginForm() {
   const [magicLinkSent, setMagicLinkSent] = useState(false)
   const [magicLinkLoading, setMagicLinkLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [tosAccepted, setTosAccepted] = useState(false)
 
   useEffect(() => {
     const errorParam = searchParams.get('error')
@@ -109,7 +111,7 @@ function LoginForm() {
         )}
 
         <form action={signInWithGoogle}>
-          <GoogleSubmitButton />
+          <GoogleSubmitButton disabled={!tosAccepted} />
         </form>
         <p className="text-xs leading-relaxed text-muted-foreground">
           Se abrirá Google para continuar. Puede aparecer *.supabase.co porque
@@ -164,7 +166,7 @@ function LoginForm() {
               type="submit"
               variant="outline"
               className="w-full gap-2"
-              disabled={magicLinkLoading}
+              disabled={magicLinkLoading || !tosAccepted}
             >
               {magicLinkLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -175,6 +177,28 @@ function LoginForm() {
             </Button>
           </form>
         )}
+
+        {/* Checkbox de consentimiento */}
+        <label className="flex items-start gap-2.5 cursor-pointer group" htmlFor="tos-login">
+          <input
+            id="tos-login"
+            type="checkbox"
+            checked={tosAccepted}
+            onChange={(e) => setTosAccepted(e.target.checked)}
+            className="mt-0.5 h-4 w-4 flex-shrink-0 cursor-pointer"
+          />
+          <span className="text-xs text-muted-foreground leading-relaxed group-hover:text-foreground transition-colors">
+            Acepté los{' '}
+            <Link
+              href="/terminos"
+              target="_blank"
+              className="underline underline-offset-2 hover:text-foreground transition-colors"
+            >
+              Términos y Condiciones
+            </Link>
+            {' '}y la Política de Privacidad
+          </span>
+        </label>
       </CardContent>
     </Card>
   )

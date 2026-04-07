@@ -17,10 +17,13 @@ Leé `SPEC.md` para la especificación completa y `README.md` para setup y deplo
 
 ```
 app/
-├── (auth)/          → login (Google OAuth / magic link) y callback
+├── (auth)/          → login (Google OAuth / magic link) y callback (registra tos_accepted_at)
 ├── (app)/           → rutas protegidas: dashboard de materias, calendario, perfil
+│   └── perfil/
+│       └── actions.ts   → Server Actions: deleteAccount, acceptTerms
 ├── api/             → route handlers (calendario-fau, mesas-fau, vapid-public)
-├── page.tsx         → landing page pública
+├── page.tsx         → landing page pública (con checkbox de T&C)
+├── terminos/        → página pública de Términos y Condiciones (/terminos)
 └── layout.tsx       → root layout con ThemeProvider
 
 components/
@@ -31,7 +34,7 @@ components/
 ├── easter-egg/      → celebración al completar la carrera
 ├── calendario/      → calendario de mesas de examen
 ├── guarani/         → importación desde SIU Guaraní (.xls)
-├── perfil/          → configuración, export/import, notificaciones
+├── perfil/          → NotificationPrefs, DeleteAccountSection
 ├── auth/            → componentes de login
 └── ui/              → primitivos shadcn/ui
 
@@ -45,7 +48,7 @@ lib/
 └── types.ts         → tipos compartidos
 
 supabase/
-├── migrations/      → 001 a 009 (schema, notificaciones, mesas, alertas push)
+├── migrations/      → 001 a 010 (schema, notificaciones, mesas, alertas push, tos_accepted_at)
 └── functions/       → check-vencimientos (Edge Function, cron diario)
 ```
 
@@ -77,12 +80,14 @@ supabase/
 - Para crear una migración nueva: `npx supabase migration new <nombre>`.
 - Trigger `handle_new_user()` crea el perfil automáticamente al registrarse vía Auth.
 - Trigger `update_updated_at()` mantiene `materia_estados.updated_at` sincronizado.
+- `profiles.tos_accepted_at` registra cuándo el usuario aceptó los T&C (NULL = aún no lo hizo).
 
 ## Edge Functions
 
 - Ubicación: `supabase/functions/<nombre>/`.
 - La función `check-vencimientos` corre como **cron diario** y maneja alertas de vencimientos y mesas.
-- Los secrets (VAPID keys, etc.) se configuran en Supabase Dashboard, no se commitean.
+- Los secrets (VAPID keys, `SUPABASE_SERVICE_ROLE_KEY`, etc.) se configuran en Supabase Dashboard, no se commitean.
+- `SUPABASE_SERVICE_ROLE_KEY` también es necesaria en Vercel (como variable de entorno servidor) para el Server Action `deleteAccount`.
 - Deploy: `npx supabase functions deploy <nombre>`.
 
 ## Linting y build
@@ -122,3 +127,4 @@ supabase/
 - No inventar correlatividades que no estén en `SPEC.md`.
 - No calcular el promedio con aplazos (solo notas aprobadas).
 - No commitear secrets (`.env.local` está en `.gitignore`).
+- No exponer `SUPABASE_SERVICE_ROLE_KEY` al cliente; usarla solo en Server Actions y Edge Functions.

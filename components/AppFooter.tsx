@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import Link from 'next/link'
 
 interface AppFooterProps {
   className?: string
@@ -14,6 +15,13 @@ export function AppFooter({ className }: AppFooterProps) {
         <strong className="font-medium text-foreground/60">Teo Risso</strong>
         {' '}— Estudiante y desarrollador
       </span>
+      <span className="mx-2 opacity-40">·</span>
+      <Link
+        href="/terminos"
+        className="underline underline-offset-2 hover:opacity-80 transition-opacity"
+      >
+        Términos y Condiciones
+      </Link>
     </footer>
   )
 }

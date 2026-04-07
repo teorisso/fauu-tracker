@@ -30,12 +30,15 @@ su progreso se guarda en la nube y puede acceder desde cualquier dispositivo.
 │   │   │   ├── page.tsx          → calendario de mesas de examen
 │   │   │   └── gestionar/        → gestión de mesas personalizadas
 │   │   └── perfil/
-│   │       └── page.tsx          → importación Guaraní, vencimientos, notificaciones, gamificación
+│   │       ├── page.tsx          → importación Guaraní, vencimientos, notificaciones, gamificación, eliminación de cuenta
+│   │       └── actions.ts        → Server Actions: deleteAccount, acceptTerms
 │   ├── api/
 │   │   ├── calendario-fau/       → scraping del calendario académico FAU
 │   │   ├── mesas-fau/            → scraping de mesas de examen FAU
 │   │   └── vapid-public/         → endpoint para clave pública VAPID (runtime)
-│   ├── page.tsx                  → landing page pública
+│   ├── page.tsx                  → landing page pública con login y checkbox de T&C
+│   ├── terminos/
+│   │   └── page.tsx              → página pública de Términos y Condiciones
 │   └── layout.tsx                → root layout con ThemeProvider
 ├── components/
 │   ├── materias/
@@ -68,6 +71,7 @@ su progreso se guarda en la nube y puede acceder desde cualquier dispositivo.
 │   │   └── VencimientoEditor.tsx → editor de fechas de vencimiento
 │   ├── perfil/
 │   │   └── NotificationPrefs.tsx → configuración de alertas (email + push)
+│   │   └── DeleteAccountSection.tsx → zona de peligro: eliminar cuenta
 │   ├── auth/
 │   │   └── LogoutButton.tsx
 │   ├── easter-egg/               → (pendiente de implementar)
@@ -116,7 +120,8 @@ su progreso se guarda en la nube y puede acceder desde cualquier dispositivo.
 │   ├── robots.txt
 │   └── llms.txt
 ├── middleware.ts                  → protección de rutas con Supabase Auth
-└── SPEC.md                       → este archivo
+├── SPEC.md                       → este archivo
+└── AGENTS.md                     → convenciones y arquitectura para IA
 ```
 
 ---
@@ -137,7 +142,8 @@ create table public.profiles (
   nombre_completo text,
   created_at timestamptz default now(),
   carrera_completada boolean default false,
-  carrera_completada_at timestamptz
+  carrera_completada_at timestamptz,
+  tos_accepted_at timestamptz  -- NULL = aún no aceptó los T&C explícitamente
 );
 
 -- Estado de cada materia por usuario
@@ -554,9 +560,10 @@ export const CORRELATIVIDADES: ReglaCorrelatividad[] = [
 ### Autenticación
 - Login con Google OAuth (Supabase lo maneja)
 - Login con magic link por email (sin contraseña)
-- Pantalla de login simple y limpia
+- Pantalla de login simple con checkbox de consentimiento de T&C
 - Redirect automático si ya está logueado
 - Protección de rutas con middleware de Next.js
+- Al autenticarse, se registra automáticamente `tos_accepted_at` en profiles
 
 ### Interacción con materias
 Al hacer click en cualquier materia se abre un menú contextual flotante
@@ -635,6 +642,22 @@ Mostrar con honestidad: "Estimación aproximada basada en tu ritmo actual"
 - Import: sube un JSON y pregunta si quiere reemplazar o mergear
 - El JSON debe ser legible (con nombres de materias, no solo IDs)
 
+### Términos y Condiciones / Privacidad
+- Página pública en `/terminos` accesible sin login
+- Checkbox de consentimiento explícito en landing y página de login
+- Los botones de autenticación permanecen deshabilitados hasta aceptar
+- Al autenticarse, se registra `tos_accepted_at` en profiles (idempotente, solo si era NULL)
+- Link a `/terminos` en el footer de la app (todas las vistas)
+
+### Eliminación de cuenta
+- Sección "Zona de peligro" en la página de perfil
+- Diálogo de confirmación de doble paso: el usuario debe escribir `ELIMINAR`
+- Muestra lista explícita de todos los datos que se borran
+- Al confirmar: cierra sesión y elimina el usuario de `auth.users` → el CASCADE borra
+  profiles, materia_estados, seminarios, notification_preferences, push_subscriptions, mesas_usuario, mesas_custom, alert_rules
+- Redirige a la landing con query `?cuenta_eliminada=1`
+- Implementado como Server Action usando `supabase.auth.admin.deleteUser()` (service role)
+
 ---
 
 ## Diseño visual
@@ -687,10 +710,11 @@ NEXT_PUBLIC_SUPABASE_URL=        # URL del proyecto Supabase
 NEXT_PUBLIC_SUPABASE_ANON_KEY=   # Clave anónima pública
 NEXT_PUBLIC_APP_URL=             # URL pública de la app (para emails)
 VAPID_PUBLIC_KEY=                # Clave pública VAPID (runtime, vía /api/vapid-public)
+SUPABASE_SERVICE_ROLE_KEY=       # Service role key (Server Actions: deleteAccount)
 ```
 
-**Nota:** `SUPABASE_SERVICE_ROLE_KEY` solo se usa en la Edge Function
-`check-vencimientos` (como secret de Supabase), no en `.env.local`.
+**Nota:** `SUPABASE_SERVICE_ROLE_KEY` se usa en el Server Action `deleteAccount` (para
+`auth.admin.deleteUser`) y en la Edge Function `check-vencimientos`. Nunca se expone al cliente.
 
 ---
 

@@ -5,6 +5,7 @@ import { GuaraniImport } from '@/components/guarani/GuaraniImport'
 import { VencimientoEditor } from '@/components/guarani/VencimientoEditor'
 import { NotificationPrefs } from '@/components/perfil/NotificationPrefs'
 import { PerfilGamification } from '@/components/gamification/PerfilGamification'
+import { DeleteAccountSection } from '@/components/perfil/DeleteAccountSection'
 import { MATERIAS } from '@/lib/data/materias'
 import { parseAlertRules } from '@/lib/notifications'
 
@@ -150,6 +151,8 @@ export default async function PerfilPage() {
           initialPushSubscriptionCount={pushSubCount ?? 0}
         />
       </section>
+
+      <DeleteAccountSection />
 
     </div>
   )

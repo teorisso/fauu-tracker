@@ -18,6 +18,22 @@ function safeNextPath(next: string | null): string {
   return next
 }
 
+/**
+ * Registra la aceptación de T&C si el usuario aún no lo hizo.
+ * Idempotente: usa IS NULL para no sobreescribir aceptaciones previas.
+ */
+async function markTosAccepted(supabase: ReturnType<typeof createClient>, userId: string) {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ tos_accepted_at: new Date().toISOString() })
+    .eq('id', userId)
+    .is('tos_accepted_at', null)
+
+  if (error) {
+    console.warn('[callback] No se pudo registrar tos_accepted_at:', error.message)
+  }
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const nextPath = safeNextPath(searchParams.get('next'))
@@ -37,21 +53,23 @@ export async function GET(request: Request) {
 
   // Flujo OAuth (Google) — intercambia el código de autorización por sesión
   if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-    if (!error) {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+    if (!error && data.user) {
+      await markTosAccepted(supabase, data.user.id)
       return NextResponse.redirect(`${origin}${nextPath}`)
     }
-    console.error('[callback] exchangeCodeForSession falló:', error.message)
+    console.error('[callback] exchangeCodeForSession falló:', error?.message)
     return NextResponse.redirect(`${origin}/login?error=oauth_failed`)
   }
 
   // Flujo magic link — verifica el token hash OTP
   if (token_hash && type) {
-    const { error } = await supabase.auth.verifyOtp({ token_hash, type })
-    if (!error) {
+    const { data, error } = await supabase.auth.verifyOtp({ token_hash, type })
+    if (!error && data.user) {
+      await markTosAccepted(supabase, data.user.id)
       return NextResponse.redirect(`${origin}${nextPath}`)
     }
-    console.error('[callback] verifyOtp falló:', error.message)
+    console.error('[callback] verifyOtp falló:', error?.message)
     return NextResponse.redirect(`${origin}/login?error=link_expired`)
   }
 
