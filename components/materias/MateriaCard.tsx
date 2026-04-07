@@ -115,8 +115,16 @@ export function MateriaCard({
   return (
     <>
       <EstadoMenu estadoActual={estadoActual} onSelect={handleEstadoSelect}>
-        <button
-          className="relative w-full rounded-lg border p-3 text-left transition-colors duration-150 ease-in-out hover:opacity-90"
+        <div
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              e.currentTarget.click()
+            }
+          }}
+          className="group relative w-full rounded-lg border p-3 text-left transition-colors duration-150 ease-in-out hover:opacity-90"
           style={{ backgroundColor: colors.bg, color: colors.fg }}
         >
           {/* Vencimiento badge */}
@@ -156,15 +164,14 @@ export function MateriaCard({
                 {estado.cuatrimestre ? ` · ${estado.cuatrimestre}°C` : ''}
               </span>
             )}
-            {/* Botón compartir — visible en aprobadas/promocionadas */}
+            {/* Botón compartir — absoluto para no afectar el layout */}
             {onCompartir && (estadoActual === 'final_aprobado' || estadoActual === 'promocionada') && (
               <button
                 onClick={(e) => {
                   e.stopPropagation()
                   onCompartir(materia.id, materia.nombre, estado?.nota)
                 }}
-                className="rounded-md p-1 opacity-40 transition-all hover:opacity-100"
-                style={{ color: colors.fg }}
+                className="absolute bottom-2.5 right-2.5 hidden rounded-md p-1.5 text-muted-foreground transition-all hover:bg-background/60 group-hover:flex"
                 title="Compartir en stories"
                 aria-label="Compartir materia"
               >
@@ -186,7 +193,7 @@ export function MateriaCard({
               {vencInfo.label}
             </p>
           )}
-        </button>
+        </div>
       </EstadoMenu>
 
       <CorrelativaWarning

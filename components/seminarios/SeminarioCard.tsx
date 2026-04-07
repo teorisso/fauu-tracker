@@ -76,7 +76,7 @@ export function SeminarioCard({ seminario, onUpdate, onCompartir }: SeminarioCar
   return (
     <>
       <div
-        className="overflow-hidden rounded-lg border p-3 transition-colors duration-150"
+        className="group overflow-hidden rounded-lg border p-3 transition-colors duration-150"
         style={{ backgroundColor: colors.bg, color: colors.fg }}
       >
         <div className="flex items-start justify-between gap-2">
@@ -154,8 +154,7 @@ export function SeminarioCard({ seminario, onUpdate, onCompartir }: SeminarioCar
           {onCompartir && (seminario.estado === 'final_aprobado' || seminario.estado === 'promocionada') && (
             <button
               onClick={() => onCompartir(displayName, seminario.nota)}
-              className="rounded-md p-1 opacity-40 transition-all hover:opacity-100"
-              style={{ color: colors.fg }}
+              className="shrink-0 rounded-md p-1.5 text-muted-foreground opacity-0 transition-all hover:bg-background/60 group-hover:opacity-100"
               title="Compartir en stories"
               aria-label="Compartir optativa"
             >
