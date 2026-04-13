@@ -2,6 +2,9 @@ import * as XLSX from 'xlsx'
 import { GUARANI_CODE_MAP } from '@/lib/data/guaraniCodeMap'
 import { Estado } from '@/lib/types'
 
+type GuaraniFileType = 'xls' | 'pdf'
+type PdfJsModule = typeof import('pdfjs-dist')
+
 export interface GuaraniMateria {
   codigoGuarani: string
   nombreGuarani: string
@@ -26,6 +29,14 @@ const ESTADO_PRIORIDAD: Record<Estado, number> = {
 }
 
 const ARQ_CODE_REGEX = /\((ARQ-[\w.-]+)\)\s*$/
+const PDF_ROW_REGEX = /^(.+?\(ARQ-[\w.-]+\))\s+(\d{2}\/\d{2}\/\d{4})\s+(.+)$/
+const PDF_PAGE_INFO_REGEX = /^\d+\s+DE\s+\d+\s+\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}:\d{2}$/
+const PDF_PAGE_BREAK_REGEX = /^--\s*\d+\s+OF\s+\d+\s*--$/
+const PDF_Y_TOLERANCE = 2
+const DATE_REGEX = /^\d{2}\/\d{2}\/\d{4}$/
+
+let pdfJsModulePromise: Promise<PdfJsModule> | null = null
+let pdfWorkerConfigured = false
 
 // Convert DD/MM/YYYY string to YYYY-MM-DD
 function parseFechaGuarani(fechaStr: string): string | null {
@@ -64,61 +75,283 @@ interface RowData {
   resultado: string
 }
 
-function parseRows(sheet: XLSX.WorkSheet): RowData[] {
-  const json = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, defval: '' })
-  const rows: RowData[] = []
+interface PdfTextItem {
+  str: string
+  transform: number[]
+}
 
-  // Find the header row (contains "Actividad" and "Fecha")
-  let headerRowIndex = -1
-  for (let i = 0; i < json.length; i++) {
-    const row = json[i]
-    if (
-      Array.isArray(row) &&
-      row.some((cell) => String(cell).trim() === 'Actividad') &&
-      row.some((cell) => String(cell).trim() === 'Fecha')
-    ) {
-      headerRowIndex = i
-      break
+interface XlsColumnIndexes {
+  actividad: number
+  fecha: number
+  tipo: number
+  nota: number
+  resultado: number
+}
+
+function getPdfJsModule(): Promise<PdfJsModule> {
+  pdfJsModulePromise ??= import('pdfjs-dist').then((module) => {
+    if (!pdfWorkerConfigured && typeof window !== 'undefined' && 'Worker' in window) {
+      module.GlobalWorkerOptions.workerPort = new Worker(
+        new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url),
+        { type: 'module' }
+      )
+      pdfWorkerConfigured = true
+    }
+
+    return module
+  })
+  return pdfJsModulePromise
+}
+
+function normalizeGuaraniText(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function isPdfTextItem(item: unknown): item is PdfTextItem {
+  if (typeof item !== 'object' || item === null) return false
+
+  const maybeItem = item as Record<string, unknown>
+  return (
+    typeof maybeItem.str === 'string' &&
+    Array.isArray(maybeItem.transform) &&
+    maybeItem.transform.every((value) => typeof value === 'number')
+  )
+}
+
+function isPdfHeaderLine(line: string): boolean {
+  const normalized = normalizeGuaraniText(line).toUpperCase()
+
+  if (!normalized) return true
+  if (normalized === 'HISTORIA ACADEMICA') return true
+  if (normalized === 'ACTIVIDAD FECHA TIPO NOTA RESULTADO') return true
+  if (normalized.startsWith('PROPUESTA:')) return true
+  if (normalized.startsWith('ALUMNO:')) return true
+  if (PDF_PAGE_INFO_REGEX.test(normalized)) return true
+  if (PDF_PAGE_BREAK_REGEX.test(normalized)) return true
+
+  return false
+}
+
+function parsePdfLine(line: string): RowData | null {
+  const cleanedLine = line.replace(/\s+/g, ' ').trim()
+  if (!cleanedLine || isPdfHeaderLine(cleanedLine)) return null
+
+  const match = cleanedLine.match(PDF_ROW_REGEX)
+  if (!match) return null
+
+  const actividad = match[1].trim()
+  const fecha = match[2].trim()
+  const resto = match[3].trim()
+
+  if (!ARQ_CODE_REGEX.test(actividad)) return null
+
+  const normalizedResto = normalizeGuaraniText(resto).toUpperCase()
+  if (normalizedResto === 'EN CURSO') {
+    return {
+      actividad,
+      fecha,
+      tipo: 'En curso',
+      nota: '',
+      resultado: 'En curso',
     }
   }
 
-  if (headerRowIndex === -1) return rows
+  const tokens = resto.split(/\s+/).filter(Boolean)
+  if (tokens.length < 2) return null
 
-  const headers = (json[headerRowIndex] as string[]).map((h) => String(h).trim().toLowerCase())
-  const colActividad = headers.indexOf('actividad')
-  const colFecha = headers.indexOf('fecha')
-  const colTipo = headers.indexOf('tipo')
-  const colNota = headers.indexOf('nota')
-  const colResultado = headers.indexOf('resultado')
+  const [firstToken, secondToken, ...remainingTokens] = tokens
+  if (!firstToken || !secondToken) return null
 
-  if (colActividad === -1 || colFecha === -1) return rows
-
-  for (let i = headerRowIndex + 1; i < json.length; i++) {
-    const row = json[i] as unknown[]
-    const actividad = String(row[colActividad] ?? '').trim()
-    if (!actividad || !ARQ_CODE_REGEX.test(actividad)) continue
-
-    rows.push({
+  if (remainingTokens.length === 0) {
+    return {
       actividad,
-      fecha: String(row[colFecha] ?? '').trim(),
-      tipo: String(row[colTipo] ?? '').trim(),
-      nota: row[colNota],
-      resultado: String(row[colResultado] ?? '').trim(),
-    })
+      fecha,
+      tipo: firstToken,
+      nota: '',
+      resultado: secondToken,
+    }
+  }
+
+  if (cleanNota(secondToken) !== undefined || /^[A-Za-z]$/.test(secondToken)) {
+    return {
+      actividad,
+      fecha,
+      tipo: firstToken,
+      nota: secondToken,
+      resultado: remainingTokens.join(' '),
+    }
+  }
+
+  return {
+    actividad,
+    fecha,
+    tipo: `${firstToken} ${secondToken}`,
+    nota: '',
+    resultado: remainingTokens.join(' '),
+  }
+}
+
+function extractPdfLines(items: unknown[]): string[] {
+  const groupedByY = new Map<number, PdfTextItem[]>()
+
+  for (const item of items) {
+    if (!isPdfTextItem(item)) continue
+    const y = item.transform[5]
+    if (typeof y !== 'number') continue
+
+    const existingY = Array.from(groupedByY.keys()).find(
+      (lineY) => Math.abs(lineY - y) <= PDF_Y_TOLERANCE
+    )
+    const lineKey = existingY ?? y
+    const lineItems = groupedByY.get(lineKey) ?? []
+    lineItems.push(item)
+    groupedByY.set(lineKey, lineItems)
+  }
+
+  return Array.from(groupedByY.entries())
+    .sort((a, b) => b[0] - a[0])
+    .map(([, lineItems]) =>
+      lineItems
+        .sort((a, b) => a.transform[4] - b.transform[4])
+        .map((item) => item.str.trim())
+        .filter(Boolean)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    )
+    .filter(Boolean)
+}
+
+async function parsePdfRows(buffer: ArrayBuffer): Promise<RowData[]> {
+  const pdfjs = await getPdfJsModule()
+  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(buffer) })
+  const pdf = await loadingTask.promise
+
+  try {
+    const rows: RowData[] = []
+
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+      const page = await pdf.getPage(pageNumber)
+      const textContent = await page.getTextContent({
+        includeMarkedContent: false,
+        disableNormalization: false,
+      })
+
+      for (const line of extractPdfLines(textContent.items)) {
+        const row = parsePdfLine(line)
+        if (row) rows.push(row)
+      }
+    }
+
+    return rows
+  } finally {
+    await pdf.destroy()
+  }
+}
+
+function getHeaderIndexes(row: unknown[]): XlsColumnIndexes | null {
+  const headers = row.map((cell) => normalizeGuaraniText(String(cell)).toLowerCase())
+  const actividad = headers.indexOf('actividad')
+  const fecha = headers.indexOf('fecha')
+  if (actividad === -1 || fecha === -1) return null
+
+  return {
+    actividad,
+    fecha,
+    tipo: headers.indexOf('tipo'),
+    nota: headers.indexOf('nota'),
+    resultado: headers.indexOf('resultado'),
+  }
+}
+
+function parseRowFromIndexes(row: unknown[], indexes: XlsColumnIndexes): RowData | null {
+  const actividad = String(row[indexes.actividad] ?? '').trim()
+  const fecha = String(row[indexes.fecha] ?? '').trim()
+  if (!actividad || !fecha || !ARQ_CODE_REGEX.test(actividad) || !DATE_REGEX.test(fecha)) return null
+
+  return {
+    actividad,
+    fecha,
+    tipo: indexes.tipo >= 0 ? String(row[indexes.tipo] ?? '').trim() : '',
+    nota: indexes.nota >= 0 ? row[indexes.nota] : '',
+    resultado: indexes.resultado >= 0 ? String(row[indexes.resultado] ?? '').trim() : '',
+  }
+}
+
+function parseRowByPattern(row: unknown[]): RowData | null {
+  const cells = row.map((cell) => String(cell ?? '').trim())
+  const actividadIndex = cells.findIndex((cell) => ARQ_CODE_REGEX.test(cell))
+  const fechaIndex = cells.findIndex((cell) => DATE_REGEX.test(cell))
+  if (actividadIndex === -1 || fechaIndex === -1) return null
+
+  const actividad = cells[actividadIndex]
+  const fecha = cells[fechaIndex]
+  const tail = cells
+    .filter((cell, index) => index !== actividadIndex && index !== fechaIndex)
+    .filter(Boolean)
+
+  const [tipo = '', maybeNota = '', ...remaining] = tail
+  if (!tipo) return null
+
+  if (remaining.length === 0) {
+    return {
+      actividad,
+      fecha,
+      tipo,
+      nota: '',
+      resultado: maybeNota,
+    }
+  }
+
+  if (cleanNota(maybeNota) !== undefined || /^[A-Za-z]$/.test(maybeNota)) {
+    return {
+      actividad,
+      fecha,
+      tipo,
+      nota: maybeNota,
+      resultado: remaining.join(' '),
+    }
+  }
+
+  return {
+    actividad,
+    fecha,
+    tipo: `${tipo} ${maybeNota}`.trim(),
+    nota: '',
+    resultado: remaining.join(' '),
+  }
+}
+
+function parseRows(sheet: XLSX.WorkSheet): RowData[] {
+  const json = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, defval: '' })
+  const rows: RowData[] = []
+  let currentIndexes: XlsColumnIndexes | null = null
+
+  for (const sheetRow of json) {
+    const row = sheetRow as unknown[]
+    const headerIndexes = getHeaderIndexes(row)
+    if (headerIndexes) {
+      currentIndexes = headerIndexes
+      continue
+    }
+
+    const parsed = currentIndexes
+      ? parseRowFromIndexes(row, currentIndexes)
+      : parseRowByPattern(row)
+
+    if (parsed) {
+      rows.push(parsed)
+    }
   }
 
   return rows
 }
 
-export function parsearArchivoGuarani(buffer: ArrayBuffer): GuaraniMateria[] {
-  const data = new Uint8Array(buffer)
-  const workbook = XLSX.read(data, { type: 'array', cellDates: false })
-
-  // Use first sheet
-  const sheetName = workbook.SheetNames[0]
-  const sheet = workbook.Sheets[sheetName]
-  const rows = parseRows(sheet)
-
+function buildMateriasDesdeRows(rows: RowData[]): GuaraniMateria[] {
   // Group rows by ARQ code
   const groupedByCode = new Map<string, { nombre: string; rows: RowData[] }>()
 
@@ -242,4 +475,24 @@ export function parsearArchivoGuarani(buffer: ArrayBuffer): GuaraniMateria[] {
   }
 
   return Array.from(deduped.values())
+}
+
+export async function parsearArchivoGuarani(
+  buffer: ArrayBuffer,
+  fileType: GuaraniFileType = 'xls'
+): Promise<GuaraniMateria[]> {
+  const rows =
+    fileType === 'pdf'
+      ? await parsePdfRows(buffer)
+      : (() => {
+          const data = new Uint8Array(buffer)
+          const workbook = XLSX.read(data, { type: 'array', cellDates: false })
+          const sheetName = workbook.SheetNames[0]
+          if (!sheetName) return []
+
+          const sheet = workbook.Sheets[sheetName]
+          return parseRows(sheet)
+        })()
+
+  return buildMateriasDesdeRows(rows)
 }

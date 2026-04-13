@@ -64,15 +64,17 @@ export function GuaraniImport({ userId, estadosActuales }: GuaraniImportProps) {
     setError(null)
     try {
       const buffer = await file.arrayBuffer()
-      const result = parsearArchivoGuarani(buffer)
+      const extension = file.name.split('.').pop()?.toLowerCase()
+      const fileType = extension === 'pdf' ? 'pdf' : 'xls'
+      const result = await parsearArchivoGuarani(buffer, fileType)
       if (result.length === 0) {
-        setError('No se encontraron materias en el archivo. Asegurate de subir el archivo de Historia Académica del SIU Guaraní.')
+        setError('No se encontraron materias en el archivo. Asegurate de subir el archivo .xls o .pdf de Historia Académica del SIU Guaraní.')
         return
       }
       setParsed(result)
       setStep('preview')
     } catch {
-      setError('Error al leer el archivo. Verificá que sea un archivo .xls válido de Historia Académica del SIU Guaraní.')
+      setError('Error al leer el archivo. Verificá que sea un archivo .xls o .pdf válido de Historia Académica del SIU Guaraní.')
     }
   }
 
@@ -150,17 +152,17 @@ export function GuaraniImport({ userId, estadosActuales }: GuaraniImportProps) {
               <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-8 text-center">
                 <Upload className="mx-auto h-10 w-10 text-muted-foreground/50" />
                 <p className="mt-3 text-sm font-medium">
-                  Seleccioná el archivo .xls de tu Historia Académica
+                  Seleccioná el archivo .xls o .pdf de tu Historia Académica
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  SIU Guaraní → Reportes → Historia Académica → Exportar → Excel (.xls)
+                  SIU Guaraní → Reportes → Historia Académica → Exportar → Excel (.xls) o PDF
                 </p>
                 <input
                   ref={fileRef}
                   type="file"
-                  accept=".xls,.xlsx"
-                  title="Seleccioná el archivo XLS de Historia Académica"
-                  aria-label="Archivo XLS de Historia Académica"
+                  accept=".xls,.xlsx,.pdf,application/pdf"
+                  title="Seleccioná el archivo XLS o PDF de Historia Académica"
+                  aria-label="Archivo XLS o PDF de Historia Académica"
                   className="mt-4 mx-auto block text-sm"
                   onChange={(e) => {
                     const file = e.target.files?.[0]
